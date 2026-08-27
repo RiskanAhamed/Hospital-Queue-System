@@ -1,0 +1,681 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MediFlow SaaS — Hospital Admin Login</title>
+    <meta name="description" content="Secure login for MediFlow SaaS Hospital Management Platform.">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-main: #080C14;
+            --primary: #38BDF8;
+            --primary-glow: rgba(56,189,248,0.3);
+            --secondary: #818CF8;
+            --success: #34D399;
+            --danger: #F87171;
+            --warning: #FBBF24;
+            --text-main: #F1F5F9;
+            --text-muted: #94A3B8;
+            --border: rgba(255,255,255,0.08);
+            --font: 'Plus Jakarta Sans', sans-serif;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: var(--font); background: var(--bg-main); color: var(--text-main); min-height: 100vh; overflow-x: hidden; }
+
+        /* Animated orb background */
+        .bg-orbs { position: fixed; inset: 0; pointer-events: none; overflow: hidden; z-index: 0; }
+        .orb { position: absolute; border-radius: 50%; filter: blur(80px); animation: floatOrb 14s ease-in-out infinite alternate; }
+        .orb-1 { width: 600px; height: 600px; background: rgba(56,189,248,0.08); top:-200px; left:-100px; }
+        .orb-2 { width: 500px; height: 500px; background: rgba(129,140,248,0.07); bottom:-150px; right:-50px; animation-duration: 18s; animation-delay: 3s; }
+        .orb-3 { width: 300px; height: 300px; background: rgba(52,211,153,0.05); top:40%; left:40%; animation-duration: 10s; animation-delay: 6s; }
+        @keyframes floatOrb { 0% { transform: translate(0,0) scale(1); } 100% { transform: translate(30px,40px) scale(1.1); } }
+
+        /* Layout */
+        .page-wrapper { position: relative; z-index: 1; min-height: 100vh; display: grid; grid-template-columns: 1fr 1fr; }
+
+        /* Left brand panel */
+        .brand-panel {
+            display: flex; flex-direction: column; justify-content: center;
+            padding: 60px 70px;
+            background: linear-gradient(145deg, rgba(15,23,42,0.97), rgba(8,12,20,0.99));
+            border-right: 1px solid var(--border);
+            position: relative; overflow: hidden;
+        }
+        .brand-panel::before {
+            content: ''; position: absolute; inset: 0;
+            background: radial-gradient(ellipse at 20% 50%, rgba(56,189,248,0.06) 0%, transparent 70%);
+            pointer-events: none;
+        }
+        .brand-logo-row { display: flex; align-items: center; gap: 14px; margin-bottom: 56px; }
+        .brand-icon {
+            width: 52px; height: 52px;
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border-radius: 14px; display: flex; align-items: center; justify-content: center;
+            color: #fff; box-shadow: 0 0 30px var(--primary-glow); font-size: 1.5rem;
+        }
+        .brand-name { font-size: 1.5rem; font-weight: 800; letter-spacing: -0.5px; }
+        .brand-name .saas-tag {
+            color: var(--primary); font-weight: 500; font-size: 0.85rem;
+            background: rgba(56,189,248,0.12); padding: 2px 8px; border-radius: 6px; margin-left: 6px;
+        }
+        .brand-headline { font-size: 2.5rem; font-weight: 900; line-height: 1.18; letter-spacing: -1px; margin-bottom: 20px; }
+        .gradient-text {
+            background: linear-gradient(90deg, var(--primary), var(--secondary));
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+        }
+        .brand-subtitle { font-size: 1rem; color: var(--text-muted); line-height: 1.75; max-width: 400px; margin-bottom: 48px; }
+
+        .feature-list { list-style: none; display: flex; flex-direction: column; gap: 16px; }
+        .feature-item { display: flex; align-items: center; gap: 14px; font-size: 0.92rem; color: var(--text-muted); }
+        .feature-dot {
+            width: 36px; height: 36px; border-radius: 10px;
+            display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 1rem;
+        }
+        .feature-dot.blue   { background: rgba(56,189,248,0.15);  color: var(--primary); }
+        .feature-dot.green  { background: rgba(52,211,153,0.15);  color: var(--success); }
+        .feature-dot.purple { background: rgba(129,140,248,0.15); color: var(--secondary); }
+        .feature-dot.orange { background: rgba(251,191,36,0.15);  color: var(--warning); }
+
+        .plan-badges { display: flex; gap: 10px; margin-top: 52px; flex-wrap: wrap; }
+        .plan-pill { padding: 6px 14px; border-radius: 20px; font-size: 0.75rem; font-weight: 700; border: 1px solid; }
+        .plan-pill.basic      { background: rgba(148,163,184,0.1); color: #94A3B8; border-color: rgba(148,163,184,0.2); }
+        .plan-pill.pro        { background: rgba(56,189,248,0.1);  color: var(--primary); border-color: rgba(56,189,248,0.25); }
+        .plan-pill.enterprise { background: rgba(251,191,36,0.1);  color: var(--warning); border-color: rgba(251,191,36,0.25); }
+
+        /* Right login panel */
+        .login-panel { display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 60px 70px; }
+        .login-card { width: 100%; max-width: 440px; }
+
+        .login-card-header { margin-bottom: 36px; }
+        .login-card-header h2 { font-size: 1.9rem; font-weight: 800; letter-spacing: -0.5px; }
+        .login-card-header p { color: var(--text-muted); font-size: 0.9rem; margin-top: 6px; }
+
+        .form-group { margin-bottom: 20px; }
+        .form-group label { display: block; font-size: 0.82rem; font-weight: 600; color: var(--text-muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .input-wrapper { position: relative; display: flex; align-items: center; }
+        .input-icon { position: absolute; left: 16px; color: var(--text-muted); pointer-events: none; font-size: 1rem; }
+        .form-input {
+            width: 100%;
+            background: rgba(15,23,42,0.8);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 14px 16px 14px 44px;
+            color: var(--text-main);
+            font-family: var(--font); font-size: 0.92rem;
+            transition: all 0.25s ease; outline: none;
+        }
+        .form-input:focus {
+            border-color: rgba(56,189,248,0.5);
+            box-shadow: 0 0 0 3px rgba(56,189,248,0.1);
+            background: rgba(15,23,42,1);
+        }
+        .form-input::placeholder { color: var(--text-muted); opacity: 0.6; }
+        .form-input.has-toggle { padding-right: 48px; }
+
+        .toggle-password {
+            position: absolute; right: 14px;
+            background: none; border: none; color: var(--text-muted);
+            cursor: pointer; font-size: 1rem; padding: 4px; transition: color 0.2s;
+        }
+        .toggle-password:hover { color: var(--primary); }
+
+        .btn-login {
+            width: 100%; padding: 15px;
+            background: linear-gradient(135deg, var(--primary), #0284C7);
+            border: none; border-radius: 12px; color: #fff;
+            font-family: var(--font); font-size: 0.98rem; font-weight: 700;
+            cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px;
+            transition: all 0.3s ease; box-shadow: 0 4px 20px var(--primary-glow); margin-top: 8px;
+        }
+        .btn-login:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 6px 30px var(--primary-glow); }
+        .btn-login:disabled { opacity: 0.7; cursor: not-allowed; transform: none; }
+
+        .spinner {
+            width: 18px; height: 18px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: #fff; border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .alert-box {
+            padding: 12px 16px; border-radius: 10px;
+            font-size: 0.85rem; font-weight: 600;
+            display: none; align-items: center; gap: 10px; margin-bottom: 20px;
+        }
+        .alert-box.error   { background: rgba(248,113,113,0.12); border: 1px solid rgba(248,113,113,0.3); color: var(--danger);  display: flex; }
+        .alert-box.success { background: rgba(52,211,153,0.12);  border: 1px solid rgba(52,211,153,0.3);  color: var(--success); display: flex; }
+
+        .divider { display: flex; align-items: center; gap: 12px; margin: 24px 0 20px; color: var(--text-muted); font-size: 0.78rem; }
+        .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+        .demo-box {
+            background: rgba(56,189,248,0.04);
+            border: 1px solid rgba(56,189,248,0.15);
+            border-radius: 14px; padding: 18px;
+        }
+        .demo-box-title {
+            font-size: 0.75rem; font-weight: 700; color: var(--primary);
+            text-transform: uppercase; letter-spacing: 0.8px;
+            margin-bottom: 14px; display: flex; align-items: center; gap: 6px;
+        }
+        .demo-accounts { display: flex; flex-direction: column; gap: 8px; }
+        .demo-account {
+            background: rgba(255,255,255,0.02);
+            border: 1px solid var(--border); border-radius: 10px;
+            padding: 10px 12px; cursor: pointer; transition: all 0.2s ease;
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .demo-account:hover { border-color: rgba(56,189,248,0.3); background: rgba(56,189,248,0.04); }
+        .demo-account .email { font-size: 0.8rem; font-weight: 600; color: var(--text-main); }
+        .demo-account .role-hospital { font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; }
+        .demo-pill { font-size: 0.68rem; font-weight: 700; padding: 3px 8px; border-radius: 6px; }
+        .demo-pill.admin   { background: rgba(56,189,248,0.15);  color: var(--primary); }
+        .demo-pill.staff   { background: rgba(52,211,153,0.15);  color: var(--success); }
+        .demo-pill.doctor  { background: rgba(129,140,248,0.15); color: var(--secondary); }
+
+        .login-footer { margin-top: 20px; text-align: center; font-size: 0.77rem; color: var(--text-muted); }
+        .login-footer a { color: var(--primary); text-decoration: none; }
+
+        @media (max-width: 900px) {
+            .page-wrapper { grid-template-columns: 1fr; }
+            .brand-panel  { display: none; }
+            .login-panel  { padding: 40px 24px; }
+        }
+        /* Registration Modal & Link */
+        .register-link-row { text-align: center; margin-top: 16px; font-size: 0.88rem; color: var(--text-muted); }
+        .register-link-row a { color: var(--primary); font-weight: 600; text-decoration: none; }
+        .register-link-row a:hover { text-decoration: underline; }
+
+        .modal-overlay {
+            position: fixed; inset: 0; background: rgba(8, 12, 20, 0.85);
+            backdrop-filter: blur(8px); display: none; align-items: center; justify-content: center;
+            z-index: 100; padding: 20px;
+        }
+        .modal-overlay.active { display: flex; animation: fadeIn 0.25s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .modal-card {
+            background: linear-gradient(145deg, rgba(15,23,42,0.98), rgba(8,12,20,0.99));
+            border: 1px solid var(--border); border-radius: 20px;
+            width: 100%; max-width: 480px; padding: 32px;
+            box-shadow: 0 20px 50px rgba(0,0,0,0.6); position: relative;
+        }
+        .modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+        .modal-header h3 { font-size: 1.4rem; font-weight: 800; }
+        .close-modal { background: none; border: none; color: var(--text-muted); font-size: 1.5rem; cursor: pointer; }
+        .close-modal:hover { color: var(--text-main); }
+        .form-select {
+            width: 100%; background: rgba(15,23,42,0.8); border: 1px solid var(--border);
+            border-radius: 12px; padding: 14px 16px 14px 44px; color: var(--text-main);
+            font-family: var(--font); font-size: 0.92rem; outline: none; appearance: none;
+            background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2394A3B8' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+            background-repeat: no-repeat; background-position: right 16px center; background-size: 16px;
+        }
+        .form-select:focus { border-color: rgba(56,189,248,0.5); box-shadow: 0 0 0 3px rgba(56,189,248,0.1); }
+    </style>
+</head>
+<body>
+    <div class="bg-orbs">
+        <div class="orb orb-1"></div>
+        <div class="orb orb-2"></div>
+        <div class="orb orb-3"></div>
+    </div>
+
+    <div class="page-wrapper">
+        <!-- LEFT: Brand Panel -->
+        <div class="brand-panel">
+            <div class="brand-logo-row">
+                <div class="brand-icon">⚕️</div>
+                <div class="brand-name">MediFlow <span class="saas-tag">SaaS</span></div>
+            </div>
+
+            <h1 class="brand-headline">
+                Hospital Queue Management<br>
+                <span class="gradient-text">Built for Modern Healthcare</span>
+            </h1>
+
+            <p class="brand-subtitle">
+                A multi-tenant SaaS platform for hospitals to manage patient queues,
+                appointments, and real-time staff coordination — all in one secure portal.
+            </p>
+
+            <ul class="feature-list">
+                <li class="feature-item">
+                    <div class="feature-dot blue">🔐</div>
+                    <span>Isolated per-hospital data — complete tenant security</span>
+                </li>
+                <li class="feature-item">
+                    <div class="feature-dot green">⚡</div>
+                    <span>Real-time WebSocket queue sync across all devices</span>
+                </li>
+                <li class="feature-item">
+                    <div class="feature-dot purple">📊</div>
+                    <span>Advanced analytics and patient throughput reporting</span>
+                </li>
+                <li class="feature-item">
+                    <div class="feature-dot orange">💳</div>
+                    <span>Monthly subscription plans — Basic, Pro &amp; Enterprise</span>
+                </li>
+            </ul>
+
+            <div class="plan-badges">
+                <span class="plan-pill basic">✦ Basic — ₹999/mo</span>
+                <span class="plan-pill pro">★ Pro — ₹2,999/mo</span>
+                <span class="plan-pill enterprise">◆ Enterprise — ₹7,999/mo</span>
+            </div>
+        </div>
+
+        <!-- RIGHT: Login Panel -->
+        <div class="login-panel">
+            <div class="login-card">
+                <div class="login-card-header">
+                    <h2>Welcome back 👋</h2>
+                    <p>Sign in to access your hospital's admin portal</p>
+                </div>
+
+                <div class="alert-box" id="alertBox">
+                    <span>⚠️</span>
+                    <span id="alertText"></span>
+                </div>
+
+                <form id="loginForm" onsubmit="handleLogin(event)" novalidate>
+                    <div class="form-group">
+                        <label for="loginEmail">Email Address</label>
+                        <div class="input-wrapper">
+                            <span class="input-icon">✉️</span>
+                            <input type="email" id="loginEmail" class="form-input"
+                                placeholder="admin@citycare.org" autocomplete="email" required>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="loginPassword">Password</label>
+                        <div class="input-wrapper">
+                            <span class="input-icon">🔒</span>
+                            <input type="password" id="loginPassword" class="form-input has-toggle"
+                                placeholder="Enter your password" autocomplete="current-password" required>
+                            <button type="button" class="toggle-password" id="eyeBtn" onclick="togglePwd()">👁️</button>
+                        </div>
+                    </div>
+
+                    <button type="submit" class="btn-login" id="loginBtn">
+                        <span id="btnIcon">→</span>
+                        <span id="btnText">Sign In to Admin Portal</span>
+                    </button>
+                </form>
+
+                <div class="register-link-row">
+                    Don't have an account? <a href="#" onclick="openRegisterModal(event)">Register here</a>
+                </div>
+
+                <div class="divider">or try a demo account</div>
+
+                <div class="demo-box">
+                    <div class="demo-box-title">▶ Quick Demo Login — Click to auto-fill</div>
+                    <div class="demo-accounts">
+                        <div class="demo-account" onclick="fillDemo('admin@citycare.org','admin123')">
+                            <div>
+                                <div class="email">admin@citycare.org / admin123</div>
+                                <div class="role-hospital">🏥 City Care General Hospital (HOSP001)</div>
+                            </div>
+                            <span class="demo-pill admin">ADMIN</span>
+                        </div>
+                        <div class="demo-account" onclick="fillDemo('staff@citycare.org','staff123')">
+                            <div>
+                                <div class="email">staff@citycare.org / staff123</div>
+                                <div class="role-hospital">🏥 City Care General Hospital (HOSP001)</div>
+                            </div>
+                            <span class="demo-pill staff">STAFF</span>
+                        </div>
+                        <div class="demo-account" onclick="fillDemo('dr.lin@metrohealth.org','doctor123')">
+                            <div>
+                                <div class="email">dr.lin@metrohealth.org / doctor123</div>
+                                <div class="role-hospital">🏥 Metro Health Specialty Center (HOSP002)</div>
+                            </div>
+                            <span class="demo-pill doctor">DOCTOR</span>
+                        </div>
+                    </div>
+                </div>
+
+                <p class="login-footer">
+                    Secure multi-tenant login. Each hospital has isolated data access.<br>
+                    <a href="#" onclick="openForgotModal(event)">Forgot password?</a> &nbsp;·&nbsp; <a href="#">Contact Support</a>
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Registration Modal -->
+    <div class="modal-overlay" id="registerModal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3>Create Account 🏥</h3>
+                <button class="close-modal" onclick="closeRegisterModal(event)">&times;</button>
+            </div>
+            <p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:20px;">
+                Register a patient account linked to your hospital code.
+            </p>
+
+            <div class="alert-box" id="regAlertBox">
+                <span>⚠️</span>
+                <span id="regAlertText"></span>
+            </div>
+
+            <form id="registerForm" onsubmit="handleRegister(event)" novalidate>
+                <div class="form-group">
+                    <label for="regName">Full Name</label>
+                    <div class="input-wrapper">
+                        <span class="input-icon">👤</span>
+                        <input type="text" id="regName" class="form-input" placeholder="e.g. David Miller" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="regEmail">Email Address</label>
+                    <div class="input-wrapper">
+                        <span class="input-icon">✉️</span>
+                        <input type="email" id="regEmail" class="form-input" placeholder="patient@gmail.com" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="regPassword">Password</label>
+                    <div class="input-wrapper">
+                        <span class="input-icon">🔒</span>
+                        <input type="password" id="regPassword" class="form-input" placeholder="Create a password" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="regHospitalCode">Hospital Code</label>
+                    <div class="input-wrapper">
+                        <span class="input-icon">🏥</span>
+                        <input type="text" id="regHospitalCode" class="form-input" placeholder="e.g. HOSP001 or HOSP002" required>
+                    </div>
+                </div>
+
+                <button type="submit" class="btn-login" id="regSubmitBtn" style="margin-top:16px;">
+                    <span id="regBtnText">Register Account</span>
+                </button>
+
+                <div style="text-align:center; margin-top:16px; font-size:0.85rem; color:var(--text-muted);">
+                    Already have an account? <a href="#" onclick="closeRegisterModal(event)" style="color:var(--primary); font-weight:600; text-decoration:none;">Sign in</a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://localhost:8080/api/v1';
+        const AUTH_KEY = 'mediflow_auth';
+
+        // If already logged in, go to dashboard
+        (function () {
+            try {
+                const auth = JSON.parse(localStorage.getItem(AUTH_KEY) || 'null');
+                if (auth && auth.token) window.location.href = 'index.html';
+            } catch(e) { localStorage.removeItem(AUTH_KEY); }
+        })();
+
+        function fillDemo(email, password) {
+            document.getElementById('loginEmail').value = email;
+            document.getElementById('loginPassword').value = password;
+            ['loginEmail','loginPassword'].forEach(id => {
+                const el = document.getElementById(id);
+                el.style.borderColor = 'rgba(56,189,248,0.6)';
+                setTimeout(() => el.style.borderColor = '', 1200);
+            });
+        }
+
+        function togglePwd() {
+            const inp = document.getElementById('loginPassword');
+            const btn = document.getElementById('eyeBtn');
+            if (inp.type === 'password') { inp.type = 'text'; btn.textContent = '🙈'; }
+            else { inp.type = 'password'; btn.textContent = '👁️'; }
+        }
+
+        function showAlert(msg, type='error') {
+            const box = document.getElementById('alertBox');
+            box.querySelector('span').textContent = type === 'error' ? '⚠️' : '✅';
+            document.getElementById('alertText').textContent = msg;
+            box.className = 'alert-box ' + type;
+            box.style.display = 'flex';
+            setTimeout(() => { box.style.display = 'none'; }, 5000);
+        }
+
+        function openRegisterModal(e) {
+            if (e) e.preventDefault();
+            document.getElementById('registerModal').classList.add('active');
+        }
+
+        function closeRegisterModal(e) {
+            if (e) e.preventDefault();
+            document.getElementById('registerModal').classList.remove('active');
+        }
+
+        function showRegAlert(msg, type='error') {
+            const box = document.getElementById('regAlertBox');
+            box.querySelector('span').textContent = type === 'error' ? '⚠️' : '✅';
+            document.getElementById('regAlertText').textContent = msg;
+            box.className = 'alert-box ' + type;
+            box.style.display = 'flex';
+        }
+
+        async function handleRegister(e) {
+            e.preventDefault();
+            const name         = document.getElementById('regName').value.trim();
+            const email        = document.getElementById('regEmail').value.trim().toLowerCase();
+            const password     = document.getElementById('regPassword').value;
+            const hospitalCode = document.getElementById('regHospitalCode').value.trim().toUpperCase();
+
+            if (!name || !email || !password || !hospitalCode) {
+                showRegAlert('Please fill in all required fields.');
+                return;
+            }
+
+            const regBtn = document.getElementById('regSubmitBtn');
+            const regBtnText = document.getElementById('regBtnText');
+            regBtn.disabled = true;
+            regBtnText.textContent = 'Registering...';
+
+            try {
+                const res = await fetch(`${API_BASE}/auth/register`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, email, password, role: 'PATIENT', hospitalCode })
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    closeRegisterModal();
+                    document.getElementById('loginEmail').value = email;
+                    document.getElementById('loginPassword').value = password;
+                    showAlert('Account registered successfully! Please click Sign In.', 'success');
+                } else {
+                    const errText = await res.text();
+                    showRegAlert(errText || 'Registration failed. Please check hospital code.');
+                }
+            } catch (err) {
+                showRegAlert('Could not connect to server. Please try again.');
+            } finally {
+                regBtn.disabled = false;
+                regBtnText.textContent = 'Register Account';
+            }
+        }
+
+        function setLoading(on) {
+            const btn = document.getElementById('loginBtn');
+            btn.disabled = on;
+            document.getElementById('btnIcon').textContent  = on ? '' : '→';
+            document.getElementById('btnText').textContent  = on ? 'Signing in...' : 'Sign In to Admin Portal';
+            if (on) {
+                const sp = document.createElement('div');
+                sp.className = 'spinner'; sp.id = 'spinnerEl';
+                btn.prepend(sp);
+            } else {
+                const sp = document.getElementById('spinnerEl');
+                if (sp) sp.remove();
+            }
+        }
+
+        async function handleLogin(e) {
+            e.preventDefault();
+            const email    = document.getElementById('loginEmail').value.trim().toLowerCase();
+            const password = document.getElementById('loginPassword').value;
+            if (!email || !password) { showAlert('Please enter your email and password.'); return; }
+
+            setLoading(true);
+            try {
+                const res = await fetch(`${API_BASE}/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+                if (res.ok) {
+                    saveAndRedirect(await res.json());
+                } else {
+                    if (res.status === 429) {
+                        showAlert('🚫 LOCKED OUT: ' + (await res.text()));
+                    } else {
+                        showAlert((await res.text()) || 'Invalid email or password.');
+                    }
+                    setLoading(false);
+                }
+            } catch (_) {
+                showAlert('Cannot connect to backend server. Please ensure the server is running.');
+                setLoading(false);
+            }
+        }
+
+        function saveAndRedirect(data) {
+            // BUG 21 FIX: Don't guess subscription plan — app.js will fetch the real one from the hospital API
+            localStorage.setItem(AUTH_KEY, JSON.stringify(data));
+            showAlert('Login successful! Redirecting...', 'success');
+            setTimeout(() => { window.location.href = 'index.html'; }, 800);
+        }
+
+        // --- Missing Spec Features: Forgot / Reset Password ---
+        function openForgotModal(e) {
+            if (e) e.preventDefault();
+            document.getElementById('forgotModal').classList.add('active');
+        }
+        function closeForgotModal(e) {
+            if (e) e.preventDefault();
+            document.getElementById('forgotModal').classList.remove('active');
+        }
+        function openResetModal(token) {
+            document.getElementById('resetToken').value = token;
+            document.getElementById('resetModal').classList.add('active');
+        }
+        function closeResetModal(e) {
+            if (e) e.preventDefault();
+            document.getElementById('resetModal').classList.remove('active');
+        }
+
+        async function handleForgotPassword(e) {
+            e.preventDefault();
+            const email = document.getElementById('forgotEmail').value.trim();
+            try {
+                const res = await fetch(`${API_BASE}/auth/forgot-password`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    closeForgotModal();
+                    alert(`Reset Link printed to Spring Console! Token: ${data.token}\n\nPlease check console log and reset password.`);
+                    openResetModal(data.token);
+                } else {
+                    alert(await res.text());
+                }
+            } catch (err) {
+                alert('Connection error');
+            }
+        }
+
+        async function handleResetPassword(e) {
+            e.preventDefault();
+            const token = document.getElementById('resetToken').value;
+            const password = document.getElementById('resetNewPassword').value;
+            try {
+                const res = await fetch(`${API_BASE}/auth/reset-password`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ token, password })
+                });
+                if (res.ok) {
+                    closeResetModal();
+                    alert('Password reset successfully! Please sign in.');
+                } else {
+                    alert(await res.text());
+                }
+            } catch (err) {
+                alert('Connection error');
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            const params = new URLSearchParams(window.location.search);
+            const token = params.get('token');
+            if (token) {
+                openResetModal(token);
+            }
+        });
+    </script>
+
+    <!-- Forgot Password Modal -->
+    <div class="modal-overlay" id="forgotModal">
+        <div class="modal-card" style="max-width: 440px;">
+            <div class="modal-header">
+                <h3>Forgot Password 🔑</h3>
+                <button class="close-modal" onclick="closeForgotModal(event)">&times;</button>
+            </div>
+            <p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:20px;">
+                Enter your email address to print a password reset token in the Spring Boot server console.
+            </p>
+            <form onsubmit="handleForgotPassword(event)">
+                <div class="form-group">
+                    <label>Email Address</label>
+                    <div class="input-wrapper">
+                        <span class="input-icon">✉️</span>
+                        <input type="email" id="forgotEmail" class="form-input" placeholder="admin@citycare.org" required>
+                    </div>
+                </div>
+                <button type="submit" class="btn-login" style="margin-top:16px;">
+                    Send Reset Request
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Reset Password Modal -->
+    <div class="modal-overlay" id="resetModal">
+        <div class="modal-card" style="max-width: 440px;">
+            <div class="modal-header">
+                <h3>Reset Password 🔐</h3>
+                <button class="close-modal" onclick="closeResetModal(event)">&times;</button>
+            </div>
+            <p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:20px;">
+                Enter your new password below.
+            </p>
+            <form onsubmit="handleResetPassword(event)">
+                <input type="hidden" id="resetToken">
+                <div class="form-group">
+                    <label>New Password</label>
+                    <div class="input-wrapper">
+                        <span class="input-icon">🔒</span>
+                        <input type="password" id="resetNewPassword" class="form-input" placeholder="Min 6 characters" required>
+                    </div>
+                </div>
+                <button type="submit" class="btn-login" style="margin-top:16px;">
+                    Update Password
+                </button>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

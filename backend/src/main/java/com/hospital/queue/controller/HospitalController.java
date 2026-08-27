@@ -1,0 +1,236 @@
+package com.hospital.queue.controller;
+
+import com.hospital.queue.model.Department;
+import com.hospital.queue.model.Hospital;
+import com.hospital.queue.model.Role;
+import com.hospital.queue.repository.DepartmentRepository;
+import com.hospital.queue.repository.HospitalRepository;
+import com.hospital.queue.security.TenantSecurityService;
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import com.hospital.queue.dto.AuthDtos.RegisterRequest;
+import com.hospital.queue.model.Doctor;
+import com.hospital.queue.model.User;
+import com.hospital.queue.repository.DoctorRepository;
+import com.hospital.queue.repository.UserRepository;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import java.util.Arrays;
+import java.util.List;
+
+import jakarta.validation.Valid;
+import com.hospital.queue.service.AuditLogService;
+
+@RestController
+@RequestMapping("/api/v1/hospitals")
+@RequiredArgsConstructor
+public class HospitalController {
+
+    private final HospitalRepository hospitalRepository;
+    private final DepartmentRepository departmentRepository;
+    private final UserRepository userRepository;
+    private final DoctorRepository doctorRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final TenantSecurityService tenantSecurityService;
+    private final AuditLogService auditLogService;
+
+    @GetMapping("/public/list")
+    public ResponseEntity<List<Hospital>> getPublicHospitals() {
+        return ResponseEntity.ok(hospitalRepository.findAll());
+    }
+
+    @GetMapping("/{hospitalId}")
+    public ResponseEntity<?> getHospitalById(@PathVariable String hospitalId) {
+        tenantSecurityService.validateTenantAccess(hospitalId);
+        java.util.Optional<Hospital> hospOpt = hospitalRepository.findById(hospitalId);
+        if (hospOpt.isEmpty()) {
+            hospOpt = hospitalRepository.findByCode(hospitalId);
+        }
+        return hospOpt.map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @PutMapping("/{hospitalId}")
+    public ResponseEntity<?> updateHospital(@PathVariable String hospitalId, @RequestBody Hospital updateData) {
+        tenantSecurityService.validateTenantAccess(hospitalId, Role.HOSPITAL_ADMIN);
+
+        java.util.Optional<Hospital> hospOpt = hospitalRepository.findById(hospitalId);
+        if (hospOpt.isEmpty()) {
+            hospOpt = hospitalRepository.findByCode(hospitalId);
+        }
+        if (hospOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        Hospital hospital = hospOpt.get();
+        if (updateData.getName() != null && !updateData.getName().trim().isEmpty()) {
+            hospital.setName(updateData.getName().trim());
+        }
+        if (updateData.getAddress() != null && !updateData.getAddress().trim().isEmpty()) {
+            hospital.setAddress(updateData.getAddress().trim());
+        }
+        if (updateData.getPhone() != null && !updateData.getPhone().trim().isEmpty()) {
+            hospital.setPhone(updateData.getPhone().trim());
+        }
+        if (updateData.getEmail() != null && !updateData.getEmail().trim().isEmpty()) {
+            hospital.setEmail(updateData.getEmail().trim());
+        }
+
+        // NOTE: code and subscriptionPlan are NOT modified here.
+
+        Hospital saved = hospitalRepository.save(hospital);
+        return ResponseEntity.ok(saved);
+    }
+
+    @PostMapping
+    public ResponseEntity<?> createHospital(@RequestBody Hospital requestData) {
+        tenantSecurityService.validateTenantAccess(null, Role.SUPER_ADMIN);
+
+        // FIX #11: Sanitize — only allow setting permitted fields from the request.
+        // Explicitly build the entity instead of persisting the raw request body,
+        // which could contain injected fields like 'id', 'active', 'createdAt'.
+        Hospital hospital = new Hospital();
+        if (requestData.getName() == null || requestData.getName().trim().isEmpty()) {
+            return ResponseEntity.badRequest().body("Hospital name is required.");
+        }
+        if (requestData.getCode() == null || requestData.getCode().trim().isEmpty()) {
+            return ResponseEntity.badRequest().body("Hospital code is required.");
+        }
+        hospital.setName(requestData.getName().trim());
+        hospital.setCode(requestData.getCode().trim());
+        hospital.setAddress(requestData.getAddress() != null ? requestData.getAddress().trim() : null);
+        hospital.setPhone(requestData.getPhone() != null ? requestData.getPhone().trim() : null);
+        hospital.setEmail(requestData.getEmail() != null ? requestData.getEmail().trim() : null);
+        // subscriptionPlan defaults to "BASIC" via the model; active defaults to true; createdAt auto-sets.
+
+        try {
+            Hospital saved = hospitalRepository.save(hospital);
+            return ResponseEntity.ok(saved);
+        } catch (org.springframework.dao.DuplicateKeyException e) {
+            return ResponseEntity.badRequest().body("Hospital code is already in use.");
+        }
+    }
+
+    @GetMapping("/{hospitalId}/departments")
+    public ResponseEntity<List<Department>> getDepartments(@PathVariable String hospitalId) {
+        tenantSecurityService.validateTenantAccess(hospitalId);
+        return ResponseEntity.ok(departmentRepository.findByHospitalId(hospitalId));
+    }
+
+    @PostMapping("/{hospitalId}/departments")
+    public ResponseEntity<Department> createDepartment(@PathVariable String hospitalId, @RequestBody Department department) {
+        tenantSecurityService.validateTenantAccess(hospitalId, Role.HOSPITAL_ADMIN);
+        department.setId(null);
+        department.setHospitalId(hospitalId);
+        Department saved = departmentRepository.save(department);
+        return ResponseEntity.ok(saved);
+    }
+
+    @PostMapping("/{hospitalId}/staff")
+    public ResponseEntity<?> createStaffUser(@PathVariable String hospitalId, @Valid @RequestBody RegisterRequest request) {
+        tenantSecurityService.validateTenantAccess(hospitalId, Role.HOSPITAL_ADMIN);
+
+        if (userRepository.findByEmail(request.getEmail()).isPresent()) {
+            return ResponseEntity.badRequest().body("Email is already registered.");
+        }
+
+        User user = new User();
+        user.setName(request.getName());
+        user.setEmail(request.getEmail());
+        user.setPassword(passwordEncoder.encode(request.getPassword()));
+        user.setPhone(request.getPhone());
+
+        // BUG 12 FIX: Whitelist allowed roles — block SUPER_ADMIN and PATIENT from staff endpoint
+        Role submittedRole = request.getRole() != null ? request.getRole() : Role.STAFF;
+        if (submittedRole == Role.SUPER_ADMIN || submittedRole == Role.PATIENT) {
+            return ResponseEntity.badRequest()
+                .body("Staff endpoint only allows roles: HOSPITAL_ADMIN, STAFF, DOCTOR");
+        }
+        user.setRole(submittedRole);
+        user.setHospitalId(hospitalId);
+        user.setActive(true);
+
+        User saved;
+        try {
+            saved = userRepository.save(user);
+        } catch (org.springframework.dao.DuplicateKeyException e) {
+            return ResponseEntity.badRequest().body("Email is already registered.");
+        }
+
+        // If creating a DOCTOR user, automatically provision Doctor entity
+        if (saved.getRole() == Role.DOCTOR && doctorRepository.findByUserId(saved.getId()).isEmpty()) {
+            Doctor doc = new Doctor();
+            doc.setHospitalId(hospitalId);
+            doc.setUserId(saved.getId());
+            doc.setName(saved.getName());
+            doc.setDepartmentName("General");
+            doc.setSpecialization("Specialist");
+            doc.setRoomNumber("Room TBD");
+            doc.setMaxDailyAppointments(30);
+            doc.setAvailable(true);
+            doc.setAvailableSlots(Arrays.asList("09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "14:00", "14:30"));
+            doctorRepository.save(doc);
+            auditLogService.log(hospitalId, tenantSecurityService.getCurrentUser().getUserId(), "DOCTOR_CREATED", "Provisioned Doctor: " + doc.getName() + " (User ID: " + doc.getUserId() + ")");
+        }
+
+        auditLogService.log(hospitalId, tenantSecurityService.getCurrentUser().getUserId(), "STAFF_CREATED", "Created staff: " + saved.getName() + " with role: " + saved.getRole() + " (Email: " + saved.getEmail() + ")");
+
+        return ResponseEntity.ok(saved);
+    }
+
+    @GetMapping("/{hospitalId}/patients/search")
+    public ResponseEntity<List<User>> searchPatients(@PathVariable String hospitalId, @RequestParam(required = false) String query) {
+        tenantSecurityService.validateTenantAccess(hospitalId, Role.HOSPITAL_ADMIN, Role.STAFF);
+        List<User> patients;
+        if (query != null && !query.trim().isEmpty()) {
+            String sanitizedQuery = query.trim().replaceAll("[\\\\.*+?^${}()|\\[\\]]", "\\\\$0");
+            patients = userRepository.searchPatients(hospitalId, sanitizedQuery);
+        } else {
+            patients = userRepository.findByHospitalIdAndRole(hospitalId, Role.PATIENT);
+        }
+        return ResponseEntity.ok(patients);
+    }
+
+    @PostMapping("/{hospitalId}/patients")
+    public ResponseEntity<?> createPatientUser(@PathVariable String hospitalId, @RequestBody java.util.Map<String, String> payload) {
+        tenantSecurityService.validateTenantAccess(hospitalId, Role.HOSPITAL_ADMIN, Role.STAFF);
+
+        String name = payload.get("name");
+        if (name == null || name.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body("Patient name is required.");
+        }
+
+        String email = payload.get("email");
+        if (email == null || email.trim().isEmpty()) {
+            email = "walkin." + System.currentTimeMillis() + "." + java.util.UUID.randomUUID().toString().substring(0, 6) + "@hospital.local";
+        } else {
+            email = email.trim().toLowerCase();
+            if (userRepository.findByEmail(email).isPresent()) {
+                return ResponseEntity.badRequest().body("Email is already registered to an existing patient.");
+            }
+        }
+
+        String phone = payload.get("phone");
+
+        User user = new User();
+        user.setName(name.trim());
+        user.setEmail(email);
+        user.setPhone(phone != null && !phone.trim().isEmpty() ? phone.trim() : null);
+        user.setPassword(passwordEncoder.encode(java.util.UUID.randomUUID().toString()));
+        user.setRole(Role.PATIENT);
+        user.setHospitalId(hospitalId);
+        user.setActive(true);
+
+        User saved;
+        try {
+            saved = userRepository.save(user);
+        } catch (org.springframework.dao.DuplicateKeyException e) {
+            return ResponseEntity.badRequest().body("Email is already registered to an existing patient.");
+        }
+
+        auditLogService.log(hospitalId, tenantSecurityService.getCurrentUser().getUserId(), "PATIENT_CREATED", "Created patient user: " + saved.getName() + " (Email: " + saved.getEmail() + ")");
+
+        return ResponseEntity.ok(saved);
+    }
+}

@@ -1,0 +1,313 @@
+package com.hospital.queue.service;
+
+import com.hospital.queue.model.Appointment;
+import com.hospital.queue.model.QueueCounter;
+import com.hospital.queue.model.QueueEntry;
+import com.hospital.queue.repository.AppointmentRepository;
+import com.hospital.queue.repository.QueueRepository;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.mongodb.core.FindAndModifyOptions;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
+import org.springframework.stereotype.Service;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.*;
+import java.util.stream.Collectors;
+
+import com.hospital.queue.model.Doctor;
+import com.hospital.queue.repository.DoctorRepository;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
+
+@Slf4j
+@Service
+@RequiredArgsConstructor
+public class QueueService {
+
+    private final QueueRepository queueRepository;
+    private final AppointmentRepository appointmentRepository;
+    private final DoctorRepository doctorRepository;
+    private final SimpMessagingTemplate messagingTemplate;
+    private final NotificationService notificationService;
+    private final MongoTemplate mongoTemplate;
+
+    /**
+     * FIX #9: Atomically generate the next sequence number for a doctor's queue on a given date.
+     * Uses MongoDB's findAndModify with $inc to guarantee uniqueness even under concurrent requests.
+     */
+    private int getNextSequenceNumber(String hospitalId, String doctorId, String queueDate) {
+        Query query = new Query(Criteria.where("hospitalId").is(hospitalId)
+                .and("doctorId").is(doctorId)
+                .and("queueDate").is(queueDate));
+        Update update = new Update().inc("sequenceNumber", 1);
+        FindAndModifyOptions options = FindAndModifyOptions.options().returnNew(true).upsert(true);
+
+        QueueCounter counter = mongoTemplate.findAndModify(query, update, options, QueueCounter.class);
+        return counter != null ? counter.getSequenceNumber() : 1;
+    }
+
+    public QueueEntry generateQueueForAppointment(Appointment appointment) {
+        String targetDate = (appointment.getAppointmentDate() != null && !appointment.getAppointmentDate().trim().isEmpty())
+                ? appointment.getAppointmentDate() : LocalDate.now().toString();
+
+        // FIX #9: Use atomic counter instead of count+1 pattern
+        int nextSequence = getNextSequenceNumber(appointment.getHospitalId(), appointment.getDoctorId(), targetDate);
+
+        // BUG 15 FIX: Guard against empty departmentName
+        String prefix = (appointment.getDepartmentName() != null && !appointment.getDepartmentName().isEmpty())
+                ? appointment.getDepartmentName().substring(0, 1).toUpperCase() : "A";
+        String queueNum = prefix + "-" + String.format("%02d", nextSequence);
+
+        QueueEntry entry = new QueueEntry();
+        entry.setHospitalId(appointment.getHospitalId());
+        entry.setDoctorId(appointment.getDoctorId());
+        entry.setAppointmentId(appointment.getId());
+        entry.setPatientId(appointment.getPatientId());
+        entry.setPatientName(appointment.getPatientName());
+        entry.setQueueNumber(queueNum);
+        entry.setSequenceNumber(nextSequence);
+        entry.setQueueDate(targetDate);
+        entry.setStatus("WAITING");
+
+        QueueEntry saved = queueRepository.save(entry);
+
+        appointment.setQueueNumber(queueNum);
+        appointment.setStatus("CHECKED_IN");
+        appointmentRepository.save(appointment);
+
+        broadcastQueueState(appointment.getHospitalId(), appointment.getDoctorId());
+        return saved;
+    }
+
+    public QueueEntry callNextPatient(String hospitalId, String doctorId) {
+        if (doctorId == null || doctorId.trim().isEmpty()) return null;
+        // Verify doctor belongs to hospital
+        Optional<Doctor> docOpt = doctorRepository.findById(doctorId);
+        if (docOpt.isPresent() && !docOpt.get().getHospitalId().equals(hospitalId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Access denied: Doctor does not belong to specified hospital.");
+        }
+
+        String today = LocalDate.now().toString();
+
+        // Complete any current consultation
+        Optional<QueueEntry> current = queueRepository.findFirstByHospitalIdAndDoctorIdAndQueueDateAndStatusOrderBySequenceNumberAsc(hospitalId, doctorId, today, "IN_CONSULTATION");
+        if (current.isEmpty()) {
+            current = queueRepository.findFirstByHospitalIdAndDoctorIdAndStatusOrderBySequenceNumberAsc(hospitalId, doctorId, "IN_CONSULTATION");
+        }
+        current.ifPresent(q -> {
+            q.setStatus("COMPLETED");
+            q.setCompletedAt(LocalDateTime.now());
+            queueRepository.save(q);
+            if (q.getAppointmentId() != null) {
+                appointmentRepository.findById(q.getAppointmentId()).ifPresent(appt -> {
+                    appt.setStatus("COMPLETED");
+                    appointmentRepository.save(appt);
+                });
+            }
+        });
+
+        // Find next waiting patient
+        Optional<QueueEntry> nextWaiting = queueRepository.findFirstByHospitalIdAndDoctorIdAndQueueDateAndStatusOrderBySequenceNumberAsc(hospitalId, doctorId, today, "WAITING");
+        if (nextWaiting.isEmpty()) {
+            nextWaiting = queueRepository.findFirstByHospitalIdAndDoctorIdAndStatusOrderBySequenceNumberAsc(hospitalId, doctorId, "WAITING");
+        }
+        if (nextWaiting.isPresent()) {
+            QueueEntry queue = nextWaiting.get();
+            queue.setStatus("CALLED");
+            queue.setCalledAt(LocalDateTime.now());
+            QueueEntry updated = queueRepository.save(queue);
+
+            // Notify the called patient "It's your turn"
+            notificationService.createAndSendNotification(
+                    hospitalId,
+                    updated.getPatientId(),
+                    "QUEUE_TURN",
+                    "It's your turn",
+                    "Please proceed to Room " + docOpt.map(Doctor::getRoomNumber).orElse("TBD") + " for Doctor " + docOpt.map(Doctor::getName).orElse("your doctor")
+            );
+
+            // Notify the next-in-line patient "You're next, please be ready"
+            Optional<QueueEntry> nextInLine = queueRepository.findFirstByHospitalIdAndDoctorIdAndQueueDateAndStatusOrderBySequenceNumberAsc(hospitalId, doctorId, today, "WAITING");
+            if (nextInLine.isEmpty()) {
+                nextInLine = queueRepository.findFirstByHospitalIdAndDoctorIdAndStatusOrderBySequenceNumberAsc(hospitalId, doctorId, "WAITING");
+            }
+            nextInLine.ifPresent(nil -> {
+                notificationService.createAndSendNotification(
+                        hospitalId,
+                        nil.getPatientId(),
+                        "QUEUE_NEXT",
+                        "You're next, please be ready",
+                        "You are next in line for Doctor " + docOpt.map(Doctor::getName).orElse("your doctor") + ". Please be ready."
+                );
+            });
+
+            broadcastQueueState(hospitalId, doctorId);
+            return updated;
+        }
+        broadcastQueueState(hospitalId, doctorId);
+        return null;
+    }
+
+    public QueueEntry startConsultation(String hospitalId, String queueId) {
+        if (queueId == null || queueId.trim().isEmpty()) return null;
+        Optional<QueueEntry> optionalQueue = queueRepository.findById(queueId);
+        if (optionalQueue.isPresent()) {
+            QueueEntry entry = optionalQueue.get();
+            if (!entry.getHospitalId().equals(hospitalId)) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Access denied: Queue entry does not belong to specified hospital.");
+            }
+            entry.setStatus("IN_CONSULTATION");
+            QueueEntry saved = queueRepository.save(entry);
+
+            if (saved.getAppointmentId() != null) {
+                appointmentRepository.findById(saved.getAppointmentId()).ifPresent(appt -> {
+                    appt.setStatus("IN_CONSULTATION");
+                    appointmentRepository.save(appt);
+                });
+            }
+
+            broadcastQueueState(saved.getHospitalId(), saved.getDoctorId());
+            return saved;
+        }
+        return null;
+    }
+
+    public QueueEntry completeConsultation(String hospitalId, String queueId) {
+        if (queueId == null || queueId.trim().isEmpty()) return null;
+        Optional<QueueEntry> optionalQueue = queueRepository.findById(queueId);
+        if (optionalQueue.isPresent()) {
+            QueueEntry entry = optionalQueue.get();
+            if (!entry.getHospitalId().equals(hospitalId)) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Access denied: Queue entry does not belong to specified hospital.");
+            }
+            entry.setStatus("COMPLETED");
+            entry.setCompletedAt(LocalDateTime.now());
+            QueueEntry saved = queueRepository.save(entry);
+
+            // Update associated appointment
+            if (saved.getAppointmentId() != null) {
+                appointmentRepository.findById(saved.getAppointmentId()).ifPresent(appt -> {
+                    appt.setStatus("COMPLETED");
+                    appointmentRepository.save(appt);
+                });
+            }
+
+            broadcastQueueState(saved.getHospitalId(), saved.getDoctorId());
+            return saved;
+        }
+        return null;
+    }
+
+    public QueueEntry skipPatient(String hospitalId, String queueId) {
+        if (queueId == null || queueId.trim().isEmpty()) return null;
+        Optional<QueueEntry> optionalQueue = queueRepository.findById(queueId);
+        if (optionalQueue.isPresent()) {
+            QueueEntry entry = optionalQueue.get();
+            if (!entry.getHospitalId().equals(hospitalId)) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Access denied: Queue entry does not belong to specified hospital.");
+            }
+            entry.setStatus("SKIPPED");
+            QueueEntry saved = queueRepository.save(entry);
+
+            broadcastQueueState(saved.getHospitalId(), saved.getDoctorId());
+            return saved;
+        }
+        return null;
+    }
+
+    public QueueEntry recallPatient(String hospitalId, String queueId) {
+        if (queueId == null || queueId.trim().isEmpty()) return null;
+        Optional<QueueEntry> optionalQueue = queueRepository.findById(queueId);
+        if (optionalQueue.isPresent()) {
+            QueueEntry entry = optionalQueue.get();
+            if (!entry.getHospitalId().equals(hospitalId)) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Access denied: Queue entry does not belong to specified hospital.");
+            }
+            if (!"SKIPPED".equalsIgnoreCase(entry.getStatus()) && !"CALLED".equalsIgnoreCase(entry.getStatus())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only SKIPPED or CALLED patients can be recalled.");
+            }
+            entry.setStatus("CALLED");
+            entry.setCalledAt(LocalDateTime.now());
+            QueueEntry saved = queueRepository.save(entry);
+
+            broadcastQueueState(saved.getHospitalId(), saved.getDoctorId());
+            return saved;
+        }
+        return null;
+    }
+
+    public List<QueueEntry> getDoctorQueue(String hospitalId, String doctorId) {
+        return getDoctorQueue(hospitalId, doctorId, LocalDate.now().toString());
+    }
+
+    public List<QueueEntry> getDoctorQueue(String hospitalId, String doctorId, String date) {
+        String targetDate = (date != null && !date.trim().isEmpty()) ? date : LocalDate.now().toString();
+        List<QueueEntry> entries = queueRepository.findByHospitalIdAndDoctorIdAndQueueDate(hospitalId, doctorId, targetDate);
+        if (entries.isEmpty()) {
+            return queueRepository.findByHospitalIdAndDoctorId(hospitalId, doctorId).stream()
+                    .filter(e -> e.getQueueDate() == null || targetDate.equals(e.getQueueDate()) || (e.getCreatedAt() != null && targetDate.equals(e.getCreatedAt().toLocalDate().toString())))
+                    .collect(Collectors.toList());
+        }
+        return entries;
+    }
+
+    public Map<String, Object> getQueueSummary(String hospitalId, String doctorId) {
+        return getQueueSummary(hospitalId, doctorId, LocalDate.now().toString());
+    }
+
+    public Map<String, Object> getQueueSummary(String hospitalId, String doctorId, String date) {
+        String targetDate = (date != null && !date.trim().isEmpty()) ? date : LocalDate.now().toString();
+        if (doctorId == null || doctorId.trim().isEmpty()) {
+            return Map.of(
+                "hospitalId", hospitalId != null ? hospitalId : "",
+                "doctorId", "",
+                "currentlyServingToken", "--",
+                "currentlyServingPatient", "None",
+                "currentlyServingStatus", "IDLE",
+                "waitingCount", 0L,
+                "completedCount", 0L,
+                "totalEntries", 0,
+                "entries", List.of()
+            );
+        }
+        List<QueueEntry> entries = queueRepository.findByHospitalIdAndDoctorIdAndQueueDate(hospitalId, doctorId, targetDate);
+        if (entries.isEmpty()) {
+            entries = queueRepository.findByHospitalIdAndDoctorId(hospitalId, doctorId).stream()
+                    .filter(e -> e.getQueueDate() == null || targetDate.equals(e.getQueueDate()) || (e.getCreatedAt() != null && targetDate.equals(e.getCreatedAt().toLocalDate().toString())))
+                    .collect(Collectors.toList());
+        }
+        
+        QueueEntry currentServing = entries.stream()
+                .filter(e -> "CALLED".equalsIgnoreCase(e.getStatus()) || "IN_CONSULTATION".equalsIgnoreCase(e.getStatus()))
+                .findFirst()
+                .orElse(null);
+
+        long waitingCount = entries.stream().filter(e -> "WAITING".equalsIgnoreCase(e.getStatus())).count();
+        long completedCount = entries.stream().filter(e -> "COMPLETED".equalsIgnoreCase(e.getStatus())).count();
+
+        Map<String, Object> summary = new HashMap<>();
+        summary.put("hospitalId", hospitalId);
+        summary.put("doctorId", doctorId);
+        summary.put("currentlyServingToken", currentServing != null ? currentServing.getQueueNumber() : "--");
+        summary.put("currentlyServingPatient", currentServing != null ? currentServing.getPatientName() : "None");
+        summary.put("currentlyServingStatus", currentServing != null ? currentServing.getStatus() : "IDLE");
+        summary.put("waitingCount", waitingCount);
+        summary.put("completedCount", completedCount);
+        summary.put("totalEntries", entries.size());
+        summary.put("entries", entries);
+        return summary;
+    }
+
+    public void broadcastQueueState(String hospitalId, String doctorId) {
+        if (hospitalId == null || doctorId == null || doctorId.trim().isEmpty()) return;
+        Map<String, Object> summary = getQueueSummary(hospitalId, doctorId);
+        String destination = "/topic/hospital/" + hospitalId + "/queue/" + doctorId;
+        messagingTemplate.convertAndSend(destination, summary);
+    }
+}

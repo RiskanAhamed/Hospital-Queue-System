@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MediFlow SaaS - Hospital Admin & Queue Management Portal</title>
+    <!-- Fonts & Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1/dist/sockjs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/stomp.js/2.3.3/stomp.min.js"></script>
+    <script src="auth.js"></script>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        /* Subscription badge in sidebar */
+        .subscription-badge {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            padding: 12px 14px;
+        }
+        .sub-icon {
+            font-size: 1.1rem;
+        }
+        .sub-info {
+            flex: 1;
+        }
+        .sub-info .sub-label {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .sub-info .sub-plan {
+            font-size: 0.82rem;
+            font-weight: 700;
+            margin-top: 2px;
+        }
+        .sub-info .sub-plan.pro        { color: #38BDF8; }
+        .sub-info .sub-plan.enterprise { color: #FBBF24; }
+        .sub-info .sub-plan.basic      { color: #94A3B8; }
+        /* Locked hospital info (replaces tenant switcher) */
+        .hospital-lock-box {
+            background: rgba(255,255,255,0.02);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius-md);
+            padding: 12px 14px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .hospital-lock-box .lock-icon { font-size: 1rem; color: var(--text-muted); }
+        .hospital-lock-info .lock-label { font-size: 0.7rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+        .hospital-lock-info .lock-name  { font-size: 0.82rem; font-weight: 700; color: var(--text-main); margin-top: 2px; }
+        .role-chip {
+            margin-left: auto;
+            font-size: 0.65rem;
+            font-weight: 700;
+            padding: 3px 8px;
+            border-radius: 6px;
+            background: rgba(56,189,248,0.12);
+            color: var(--primary);
+            white-space: nowrap;
+        }
+    </style>
+</head>
+<body>
+    <!-- Auth guard: redirect to login if no token -->
+    <script>
+        (function() {
+            const auth = requireAuth();
+            if (!auth) return; // will redirect
+            // Expose globally for app.js
+            window._auth = auth;
+        })();
+    </script>
+    <div id="app">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="brand">
+                <div class="brand-logo">
+                    <i data-lucide="activity"></i>
+                </div>
+                <div class="brand-text">
+                    <h2>MediFlow <span>SaaS</span></h2>
+                    <p id="currentHospitalBadge">Loading...</p>
+                </div>
+            </div>
+
+            <nav class="nav-menu">
+                <button class="nav-item active" onclick="switchTab('dashboard')">
+                    <i data-lucide="layout-dashboard"></i>
+                    <span>Dashboard & Analytics</span>
+                </button>
+                <button class="nav-item" onclick="switchTab('queue')">
+                    <i data-lucide="users"></i>
+                    <span>Queue Control Desk</span>
+                    <span class="badge" id="liveWaitingBadge">3 Waiting</span>
+                </button>
+                <button class="nav-item" onclick="switchTab('doctors')">
+                    <i data-lucide="stethoscope"></i>
+                    <span>Doctors & Schedules</span>
+                </button>
+                <button class="nav-item" onclick="switchTab('appointments')">
+                    <i data-lucide="calendar"></i>
+                    <span>Master Appointments</span>
+                </button>
+                <button class="nav-item" onclick="switchTab('departments')">
+                    <i data-lucide="building-2"></i>
+                    <span>Departments</span>
+                </button>
+                <button class="nav-item" onclick="switchTab('settings')">
+                    <i data-lucide="settings"></i>
+                    <span>Hospital Settings</span>
+                </button>
+                <button class="nav-item" onclick="switchTab('reports')">
+                    <i data-lucide="bar-chart-2"></i>
+                    <span>Operational Reports</span>
+                </button>
+                <button class="nav-item" id="navAuditTab" onclick="switchTab('audit')" style="display:none;">
+                    <i data-lucide="file-text"></i>
+                    <span>System Audit Logs</span>
+                </button>
+            </nav>
+
+            <!-- Subscription badge -->
+            <div class="subscription-badge">
+                <span class="sub-icon">💳</span>
+                <div class="sub-info">
+                    <div class="sub-label">Subscription</div>
+                    <div class="sub-plan" id="subPlanText">Loading...</div>
+                </div>
+            </div>
+
+            <!-- Locked per-tenant hospital info -->
+            <div class="hospital-lock-box">
+                <span class="lock-icon">🔒</span>
+                <div class="hospital-lock-info">
+                    <div class="lock-label">Your Hospital</div>
+                    <div class="lock-name" id="lockedHospitalName">Loading...</div>
+                </div>
+                <span class="role-chip" id="userRoleChip">STAFF</span>
+            </div>
+
+            <!-- Dynamic user profile -->
+            <div class="user-profile">
+                <div class="avatar" id="userAvatarEl">??</div>
+                <div class="user-info">
+                    <h4 id="userNameEl">Loading...</h4>
+                    <p id="userRoleEl">Hospital Staff</p>
+                </div>
+                <button class="logout-btn" onclick="logout()" title="Logout"><i data-lucide="log-out"></i></button>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <header class="top-header">
+                <div class="header-search">
+                    <i data-lucide="search"></i>
+                    <input type="text" id="searchInput" placeholder="Search patient name, queue token, or doctor..." oninput="handleSearch(this.value)">
+                </div>
+                <div class="header-actions">
+                    <div class="ws-status connected" id="wsStatus">
+                        <span class="status-dot"></span>
+                        <span id="wsStatusText">WebSocket Live Synchronized</span>
+                    </div>
+                    <button class="icon-btn" id="adminBellBtn" onclick="toggleAdminNotifications()" style="position:relative;"><i data-lucide="bell"></i><span class="dot" id="adminBellDot" style="display:none;"></span></button>
+                    <!-- Notifications Dropdown -->
+                    <div id="adminNotificationsDropdown" class="card glass" style="display:none; position:absolute; top:70px; right:150px; width:360px; z-index:1000; padding:16px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); text-align: left;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                            <h3 style="font-size:1rem; font-weight:700; margin:0;">Notifications</h3>
+                            <button onclick="markAllAdminNotificationsAsRead()" style="background:none; border:none; color:var(--primary); cursor:pointer; font-size:0.8rem; font-weight:600;">Mark all read</button>
+                        </div>
+                        <div id="adminNotificationsList" style="display:flex; flex-direction:column; gap:8px; max-height:280px; overflow-y:auto; margin-bottom:8px;">
+                            <p style="color:var(--text-muted); font-size:0.85rem; padding:8px 0; text-align:center;">No new notifications</p>
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" onclick="openNewAppointmentModal()">
+                        <i data-lucide="plus"></i> New Appointment
+                    </button>
+                </div>
+            </header>
+
+            <div class="content-body">
+                <!-- TAB 1: DASHBOARD -->
+                <section id="tab-dashboard" class="tab-page active">
+                    <div class="page-title-row">
+                        <div>
+                            <h1>Hospital Command Dashboard</h1>
+                            <p>Real-time operational overview and patient throughput analytics.</p>
+                        </div>
+                        <div class="date-badge">
+                            <i data-lucide="calendar"></i> <span id="currentDateText">Today, Aug 12</span>
+                        </div>
+                    </div>
+
+                    <!-- Metrics Grid -->
+                    <div class="metrics-grid">
+                        <div class="metric-card glass">
+                            <div class="metric-icon blue"><i data-lucide="calendar"></i></div>
+                            <div class="metric-details">
+                                <p>Total Appointments Today</p>
+                                <h3 id="statTotalAppts">--</h3>
+                                <span class="trend positive"><i data-lucide="trending-up"></i> Live Updated</span>
+                            </div>
+                        </div>
+
+                        <div class="metric-card glass">
+                            <div class="metric-icon orange"><i data-lucide="clock"></i></div>
+                            <div class="metric-details">
+                                <p>Currently Waiting Patients</p>
+                                <h3 id="statWaiting">--</h3>
+                                <span class="sub-text">In active queues</span>
+                            </div>
+                        </div>
+
+                        <div class="metric-card glass">
+                            <div class="metric-icon green"><i data-lucide="check-circle-2"></i></div>
+                            <div class="metric-details">
+                                <p>Completed Consultations</p>
+                                <h3 id="statCompleted">--</h3>
+                                <span class="trend positive" id="statCompletionPill"><i data-lucide="trending-up"></i> <span id="statCompletionRate">--%</span> completion rate</span>
+                            </div>
+                        </div>
+
+                        <div class="metric-card glass">
+                            <div class="metric-icon purple"><i data-lucide="hourglass"></i></div>
+                            <div class="metric-details">
+                                <p>Avg. Patient Wait Time</p>
+                                <h3><span id="statAvgWait">--</span> <small>mins</small></h3>
+                                <span class="trend positive" id="statPeakPill"><i data-lucide="clock"></i> Peak: <span id="statPeakHours">Not enough data</span></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Charts & Insights -->
+                    <div class="dashboard-grid">
+                        <div class="card glass chart-card">
+                            <div class="card-header">
+                                <h3>Patient Flow & Queue Hourly Distribution</h3>
+                                <button class="btn btn-sm btn-ghost">Export PDF</button>
+                            </div>
+                            <div class="chart-container">
+                                <canvas id="throughputChart"></canvas>
+                            </div>
+                        </div>
+
+                        <div class="card glass live-doctor-desk">
+                            <div class="card-header">
+                                <h3>Active Doctor Rooms</h3>
+                                <span class="badge badge-success" id="activeDoctorsBadge">-- Active Doctors</span>
+                            </div>
+                            <div class="doctor-room-list" id="doctorRoomList">
+                                <!-- Dynamic doctor cards -->
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- TAB 2: QUEUE CONTROL DESK -->
+                <section id="tab-queue" class="tab-page">
+                    <div class="page-title-row">
+                        <div>
+                            <h1>Live Staff Queue Caller Desk</h1>
+                            <p>Call next patient, start consultation, complete or skip patients in real time.</p>
+                        </div>
+                        <div class="doctor-selector-box">
+                            <label>Filter Doctor Room:</label>
+                            <select id="queueDoctorSelect" onchange="loadQueueForSelectedDoctor()">
+                                <option value="">Loading doctors...</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="queue-workspace">
+                        <!-- Left: Live Token Caller Banner -->
+                        <div class="card glass caller-hero">
+                            <div class="caller-header">
+                                <span class="pulse-ring"></span>
+                                <h2>Currently Serving Room</h2>
+                                <span class="room-pill" id="callerRoomPill">Room --</span>
+                            </div>
+                            
+                            <div class="token-display">
+                                <div class="token-number" id="callerTokenDisplay">--</div>
+                                <div class="token-patient" id="callerPatientName">None</div>
+                                <div class="token-status-pill" id="callerStatusPill">IDLE</div>
+                            </div>
+
+                            <div class="caller-action-buttons">
+                                <button class="btn btn-lg btn-success" onclick="executeQueueAction('CALL_NEXT')">
+                                    <i data-lucide="megaphone"></i> Call Next Patient
+                                </button>
+                                <button class="btn btn-lg btn-primary" onclick="executeQueueAction('START_CONSULTATION')">
+                                    <i data-lucide="play"></i> Start Consultation
+                                </button>
+                                <button class="btn btn-lg btn-secondary" onclick="executeQueueAction('COMPLETE')">
+                                    <i data-lucide="check-check"></i> Complete
+                                </button>
+                                <button class="btn btn-lg btn-warning" onclick="executeQueueAction('SKIP')">
+                                    <i data-lucide="skip-forward"></i> Skip Patient
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Right: Active Queue Table -->
+                        <div class="card glass queue-table-card">
+                            <div class="card-header">
+                                <h3 id="queueDoctorHeader">Today's Queue List</h3>
+                                <span class="badge" id="queueTotalCount">0 Patients</span>
+                            </div>
+                            <div class="table-responsive">
+                                <table class="custom-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Seq</th>
+                                            <th>Token</th>
+                                            <th>Patient Name</th>
+                                            <th>Scheduled Time</th>
+                                            <th>Status</th>
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="queueTableBody">
+                                        <!-- Dynamic queue entries -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- TAB 3: DOCTORS & SCHEDULES -->
+                <section id="tab-doctors" class="tab-page">
+                    <div class="page-title-row">
+                        <div>
+                            <h1>Doctor Directory & Duty Schedules</h1>
+                            <p>Manage hospital medical staff, rooms, and daily consultation slots.</p>
+                        </div>
+                        <div style="display:flex; gap:10px;">
+                            <button class="btn btn-secondary" onclick="openAddStaffModal()">
+                                <i data-lucide="shield"></i> Onboard Staff / User
+                            </button>
+                            <button class="btn btn-primary" onclick="openAddDoctorModal()">
+                                <i data-lucide="user-plus"></i> Onboard New Doctor
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="doctor-cards-grid" id="doctorsGrid">
+                        <!-- Dynamic Doctor Cards -->
+                    </div>
+                </section>
+
+                <!-- TAB 4: MASTER APPOINTMENTS -->
+                <section id="tab-appointments" class="tab-page">
+                    <div class="page-title-row">
+                        <div>
+                            <h1>Master Appointment Register</h1>
+                            <p>View and manage all booked patient appointments across departments.</p>
+                        </div>
+                    </div>
+                    <div class="card glass">
+                        <div class="table-responsive">
+                            <table class="custom-table">
+                                <thead>
+                                    <tr>
+                                        <th>Appt ID</th>
+                                        <th>Patient Name</th>
+                                        <th>Department</th>
+                                        <th>Doctor</th>
+                                        <th>Date & Slot</th>
+                                        <th>Queue Token</th>
+                                        <th>Status</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="masterAppointmentsBody">
+                                    <!-- Dynamic rows -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- TAB 5: DEPARTMENTS -->
+                <section id="tab-departments" class="tab-page">
+                    <div class="page-title-row">
+                        <div>
+                            <h1>Hospital Departments</h1>
+                            <p>Configure medical departments and specialty wings.</p>
+                        </div>
+                        <button class="btn btn-primary" onclick="openAddDepartmentModal()"><i data-lucide="plus-circle"></i> Add Department</button>
+                    </div>
+                    <div class="department-grid" id="departmentGrid">
+                        <!-- Dynamic department cards -->
+                    </div>
+                </section>
+
+                <!-- TAB 6: SETTINGS -->
+                <section id="tab-settings" class="tab-page">
+                    <div class="page-title-row">
+                        <div>
+                            <h1>Multi-Tenant Hospital Configuration</h1>
+                            <p>Manage hospital identity, SaaS subscription level, and WebSocket rules.</p>
+                        </div>
+                    </div>
+                    <div class="card glass settings-box">
+                        <h3>Hospital Profile & API Key</h3>
+                        <form onsubmit="saveHospitalSettings(event)">
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label>Hospital Name</label>
+                                    <input type="text" id="settingsHospitalName" placeholder="Enter Hospital Name" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Tenant Code (Multi-tenant ID)</label>
+                                    <input type="text" id="settingsTenantCode" value="" readonly style="opacity: 0.7; cursor: not-allowed;">
+                                </div>
+                                <div class="form-group">
+                                    <label>Address</label>
+                                    <input type="text" id="settingsAddress" placeholder="e.g. 124 Healthcare Boulevard, Cityville">
+                                </div>
+                                <div class="form-group">
+                                    <label>Phone</label>
+                                    <input type="text" id="settingsPhone" placeholder="e.g. +1 (555) 019-2831">
+                                </div>
+                                <div class="form-group">
+                                    <label>Email</label>
+                                    <input type="email" id="settingsEmail" placeholder="e.g. contact@hospital.org">
+                                </div>
+                                <div class="form-group">
+                                    <label>Queue Algorithm</label>
+                                    <select><option>FIFO (First-In First-Out) + Priority Call</option></select>
+                                </div>
+                                <div class="form-group">
+                                    <label>WebSocket Endpoint</label>
+                                    <input type="text" value="ws://localhost:8080/ws-queue" readonly style="opacity: 0.7; cursor: not-allowed;">
+                                </div>
+                            </div>
+                            <div style="margin-top: 20px; display: flex; justify-content: flex-end; gap: 12px;">
+                                <button type="submit" class="btn btn-primary" id="btnSaveHospitalSettings">Save Changes</button>
+                            </div>
+                        </form>
+                    </div>
+                </section>
+
+                <!-- TAB 7: REPORTS -->
+                <section id="tab-reports" class="tab-page">
+                    <div class="page-title-row">
+                        <div>
+                            <h1>Hospital Operational Reports</h1>
+                            <p>Historical trends, workload analysis, and key service metrics.</p>
+                        </div>
+                        <button class="btn btn-secondary" onclick="fetchReports()"><i data-lucide="refresh-cw"></i> Refresh Reports</button>
+                    </div>
+                    
+                    <!-- Reports Grid -->
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
+                        <!-- Report 1: Daily Appointments (Last 30 Days) -->
+                        <div class="card glass">
+                            <div class="card-header">
+                                <h3>Daily Appointment Trends (Last 30 Days)</h3>
+                            </div>
+                            <div class="table-responsive" style="max-height: 300px;">
+                                <table class="custom-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Appointments Count</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="reportAppointmentsByDateBody">
+                                        <!-- Dynamic rows -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Report 2: Cancellation Rates -->
+                        <div class="card glass">
+                            <div class="card-header">
+                                <h3>Appointment Cancellation Stats</h3>
+                            </div>
+                            <div style="padding: 20px; display: flex; flex-direction: column; gap: 16px;">
+                                <div style="display: flex; justify-content: space-between; font-size: 0.95rem;">
+                                    <span style="color: var(--text-muted);">Total Bookings:</span>
+                                    <strong id="repTotalBookings" style="color: var(--text-main);">0</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; font-size: 0.95rem;">
+                                    <span style="color: var(--text-muted);">Total Cancelled:</span>
+                                    <strong id="repTotalCancelled" style="color: #F87171;">0</strong>
+                                </div>
+                                <div style="display: flex; justify-content: space-between; font-size: 1.1rem; border-top: 1px solid var(--border-color); padding-top: 12px;">
+                                    <span style="color: var(--text-muted); font-weight: 600;">Cancellation Rate:</span>
+                                    <strong id="repCancellationPercentage" style="color: var(--primary);">0%</strong>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+                        <!-- Report 3: Doctor Workload -->
+                        <div class="card glass">
+                            <div class="card-header">
+                                <h3>Doctor Workload & Completion Counts</h3>
+                            </div>
+                            <div class="table-responsive" style="max-height: 300px;">
+                                <table class="custom-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Doctor Name</th>
+                                            <th>Total Appointments</th>
+                                            <th>Completed</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="reportDoctorWorkloadBody">
+                                        <!-- Dynamic rows -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+
+                        <!-- Report 4: Department Workload -->
+                        <div class="card glass">
+                            <div class="card-header">
+                                <h3>Department Workload Counts</h3>
+                            </div>
+                            <div class="table-responsive" style="max-height: 300px;">
+                                <table class="custom-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Department</th>
+                                            <th>Total Appointments</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="reportDepartmentWorkloadBody">
+                                        <!-- Dynamic rows -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- TAB 8: AUDIT LOGS -->
+                <section id="tab-audit" class="tab-page">
+                    <div class="page-title-row">
+                        <div>
+                            <h1>System Action Audit Logs</h1>
+                            <p>Read-only record of hospital actions (onboarding, bookings, queue actions).</p>
+                        </div>
+                        <button class="btn btn-secondary" onclick="fetchAuditLogs()"><i data-lucide="refresh-cw"></i> Refresh Logs</button>
+                    </div>
+                    <div class="card glass">
+                        <div class="table-responsive" style="max-height: 500px;">
+                            <table class="custom-table">
+                                <thead>
+                                    <tr>
+                                        <th>Timestamp</th>
+                                        <th>User ID</th>
+                                        <th>Action Type</th>
+                                        <th>Details</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="auditLogsBody">
+                                    <!-- Dynamic rows -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modals -->
+    <!-- Modal 1: Book New Appointment -->
+    <div id="modalNewAppointment" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3>Book New Patient Appointment</h3>
+                <button class="close-btn" onclick="closeNewAppointmentModal()">&times;</button>
+            </div>
+            <form onsubmit="submitNewAppointment(event)">
+                <div class="modal-body">
+                    <!-- BUG 41 FIX: Link appointment to a real patient account -->
+                    <div class="form-group">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                            <label style="margin:0;">Select Patient Account</label>
+                            <div style="display: flex; gap: 4px;">
+                                <button type="button" class="btn btn-sm btn-ghost active" id="btnTabSelectPatient" onclick="switchPatientMode('select')" style="font-size:0.75rem; padding:2px 8px;">Existing</button>
+                                <button type="button" class="btn btn-sm btn-ghost" id="btnTabRegisterPatient" onclick="switchPatientMode('register')" style="font-size:0.75rem; padding:2px 8px;">+ Walk-in</button>
+                            </div>
+                        </div>
+
+                        <!-- Mode 1: Search & Select Existing Patient -->
+                        <div id="modeSelectPatient">
+                            <input type="text" id="apptPatientSearch" placeholder="Type name or email to search..." oninput="searchPatientsForBooking(this.value)" style="margin-bottom: 6px;">
+                            <select id="apptPatientSelect" onchange="onPatientSelectChange(this)">
+                                <option value="">Loading patients...</option>
+                            </select>
+                        </div>
+
+                        <!-- Mode 2: Quick-Register New Walk-in Patient -->
+                        <div id="modeRegisterPatient" style="display:none; background: rgba(255,255,255,0.03); padding: 12px; border-radius: 8px; border: 1px solid var(--border-color);">
+                            <p style="font-size:0.78rem; color:var(--text-muted); margin-bottom:8px;">Register new walk-in patient account:</p>
+                            <div class="form-group" style="margin-bottom:8px;">
+                                <label style="font-size:0.75rem;">Full Name *</label>
+                                <input type="text" id="newPatientName" placeholder="e.g. Sarah Connor">
+                            </div>
+                            <div style="display:flex; gap:8px; margin-bottom:8px;">
+                                <div class="form-group" style="flex:1; margin-bottom:0;">
+                                    <label style="font-size:0.75rem;">Phone (Optional)</label>
+                                    <input type="text" id="newPatientPhone" placeholder="+1 555-0199">
+                                </div>
+                                <div class="form-group" style="flex:1; margin-bottom:0;">
+                                    <label style="font-size:0.75rem;">Email (Optional)</label>
+                                    <input type="email" id="newPatientEmail" placeholder="sarah@example.com">
+                                </div>
+                            </div>
+                            <button type="button" class="btn btn-sm btn-primary" onclick="quickRegisterPatient()" style="width:100%; font-size:0.8rem;">
+                                Save &amp; Select Patient
+                            </button>
+                        </div>
+
+                        <input type="hidden" id="selectedPatientId">
+                        <div id="selectedPatientBadge" style="display:none; margin-top:6px; font-size:0.78rem; color:var(--success); font-weight:600;"></div>
+                    </div>
+                    <div class="form-group">
+                        <label>Select Doctor & Department</label>
+                        <select id="apptDoctorSelect" required onchange="updateApptTimeSlots()">
+                            <!-- Dynamic Doctor Options -->
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Appointment Date</label>
+                        <input type="date" id="apptDate" required onchange="updateApptTimeSlots()">
+                    </div>
+                    <div class="form-group">
+                        <label>Time Slot</label>
+                        <select id="apptTimeSlot" required>
+                            <option value="09:00">09:00 AM</option>
+                            <option value="09:30">09:30 AM</option>
+                            <option value="10:00">10:00 AM</option>
+                            <option value="10:30">10:30 AM</option>
+                            <option value="11:00">11:00 AM</option>
+                            <option value="11:30">11:30 AM</option>
+                            <option value="14:00">02:00 PM</option>
+                            <option value="14:30">02:30 PM</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeNewAppointmentModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Book Appointment</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal 2: Onboard New Doctor -->
+    <div id="modalAddDoctor" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3>Onboard New Doctor</h3>
+                <button class="close-btn" onclick="closeAddDoctorModal()">&times;</button>
+            </div>
+            <form onsubmit="submitAddDoctor(event)">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>Doctor Full Name</label>
+                        <input type="text" id="docName" placeholder="e.g. Dr. Sarah Jenkins" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Department</label>
+                        <select id="docDepartmentSelect" required>
+                            <!-- Dynamic Department Options -->
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Specialization</label>
+                        <input type="text" id="docSpecialization" placeholder="e.g. Senior Cardiologist">
+                    </div>
+                    <div class="form-group">
+                        <label>Room / Cabin Number</label>
+                        <input type="text" id="docRoom" placeholder="e.g. Room 302" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeAddDoctorModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Doctor</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal 3: Onboard Staff / User Account -->
+    <div id="modalAddStaff" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3>Onboard Hospital Staff User</h3>
+                <button class="close-btn" onclick="closeAddStaffModal()">&times;</button>
+            </div>
+            <form onsubmit="submitAddStaff(event)">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>Full Name</label>
+                        <input type="text" id="staffName" placeholder="e.g. Sarah Staff" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Email Address</label>
+                        <input type="email" id="staffEmail" placeholder="staff@citycare.org" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Password</label>
+                        <input type="password" id="staffPassword" placeholder="Create password" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Account Role</label>
+                        <select id="staffRole" required>
+                            <option value="STAFF">Hospital Staff / Caller Desk</option>
+                            <option value="DOCTOR">Medical Doctor</option>
+                            <option value="HOSPITAL_ADMIN">Hospital Administrator</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeAddStaffModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create User Account</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal 4: Add New Department -->
+    <div id="modalAddDepartment" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3>Add New Department</h3>
+                <button class="close-btn" onclick="closeAddDepartmentModal()">&times;</button>
+            </div>
+            <form onsubmit="submitAddDepartment(event)">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>Department Name</label>
+                        <input type="text" id="deptName" placeholder="e.g. Cardiology" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Department Code</label>
+                        <input type="text" id="deptCode" placeholder="e.g. CAR" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Description</label>
+                        <input type="text" id="deptDescription" placeholder="e.g. Heart and cardiovascular care">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeAddDepartmentModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create Department</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal 5: View Appointment Details (BUG 37 FIX) -->
+    <div id="modalViewAppointment" class="modal-overlay">
+        <div class="modal-card" style="max-width:520px;">
+            <div class="modal-header">
+                <h3>Appointment Details</h3>
+                <button class="close-btn" onclick="closeAppointmentDetailModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <!-- Detail rows injected by openAppointmentDetailModal() -->
+                <div id="apptDetailContent"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeAppointmentDetailModal()">Close</button>
+                <!-- BUG 37 FIX: Cancel button shown only when appointment is still cancellable -->
+                <button type="button" class="btn btn-warning" id="btnRescheduleApptDetail" onclick="openRescheduleModalFromDetail()"
+                        style="display:none; background:rgba(251,191,36,0.15); color:#FBBF24; border:1px solid rgba(251,191,36,0.4); font-weight:600; margin-right:8px;">
+                    Reschedule Appointment
+                </button>
+                <button type="button" class="btn btn-danger" id="btnCancelApptDetail" onclick="cancelAppointmentFromModal()"
+                        style="display:none; background:rgba(248,113,113,0.15); color:#F87171; border:1px solid rgba(248,113,113,0.4);">
+                    Cancel Appointment
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal 6: Reschedule Appointment -->
+    <div id="modalRescheduleAppointment" class="modal-overlay">
+        <div class="modal-card" style="max-width: 440px;">
+            <div class="modal-header">
+                <h3>Reschedule Appointment</h3>
+                <button class="close-btn" onclick="closeRescheduleModal()">&times;</button>
+            </div>
+            <form onsubmit="submitRescheduleAppointment(event)">
+                <div class="modal-body">
+                    <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 16px;">
+                        Select a new date and time slot for your consultation.
+                    </p>
+                    <div class="form-group">
+                        <label>Select Date</label>
+                        <input type="date" id="reschDate" required onchange="onReschDateChange()">
+                    </div>
+                    <div class="form-group">
+                        <label>Select Time Slot</label>
+                        <select id="reschTimeSlot" required>
+                            <!-- Options populated dynamically -->
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeRescheduleModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Confirm Reschedule</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="app.js"></script>
+    <script>
+        lucide.createIcons();
+    </script>
+</body>
+</html>
+

@@ -1,0 +1,497 @@
+:root {
+    --bg-main: #090D16;
+    --bg-card: rgba(26, 36, 56, 0.75);
+    --border-color: rgba(255, 255, 255, 0.08);
+    
+    --primary: #38BDF8;
+    --primary-glow: rgba(56, 189, 248, 0.3);
+    --success: #34D399;
+    --warning: #FBBF24;
+    --danger: #F87171;
+    
+    --text-main: #F8FAFC;
+    --text-muted: #94A3B8;
+    
+    --font: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+    --radius-sm: 10px;
+    --radius-md: 16px;
+    --radius-lg: 24px;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: var(--font);
+    background-color: #030712;
+    color: var(--text-main);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+}
+
+/* Mobile Frame Container */
+.mobile-container {
+    width: 100%;
+    max-width: 420px;
+    height: 880px;
+    background-color: var(--bg-main);
+    border-radius: 40px;
+    border: 8px solid #1E293B;
+    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.8), 0 0 40px rgba(56, 189, 248, 0.1);
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    /* BUG 39 FIX: overflow:clip clips layout children (prevents scrollable content
+       from bleeding past the 40px rounded corners) WITHOUT creating a new scroll
+       container. Unlike overflow:hidden, absolutely-positioned modal overlays that
+       are 100%x100% of this container render fully and are not clipped. */
+    overflow: clip;
+}
+
+/* Status Bar */
+.status-bar {
+    height: 44px;
+    padding: 0 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.status-icons {
+    display: flex;
+    gap: 8px;
+}
+
+/* Mobile Header */
+.app-header {
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.user-greeting {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.avatar-sm {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #38BDF8, #818CF8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    color: #fff;
+}
+
+.greeting-subtitle {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+}
+
+.user-name {
+    font-size: 1.1rem;
+    font-weight: 700;
+}
+
+.hospital-selector-pill {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-color);
+    padding: 6px 12px;
+    border-radius: 20px;
+    color: var(--text-main);
+    font-family: var(--font);
+    font-size: 0.78rem;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    cursor: pointer;
+}
+
+/* Body Scroll Area */
+.app-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 20px;
+    /* gap removed: views are mutually exclusive panels, not stacked siblings */
+}
+
+/* Top-level view panels — each fills the full scroll area */
+#view-home, #view-appointments, #view-queue, #view-profile {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+/* Sections inside views keep the same visual spacing */
+.section-block {
+    /* kept inline in CSS below */
+}
+
+.glass {
+    background: var(--bg-card);
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-lg);
+}
+
+/* Ticket Hero Card */
+.ticket-card {
+    padding: 20px;
+    background: linear-gradient(135deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.95));
+    border: 1px solid var(--primary-glow);
+    box-shadow: 0 12px 30px rgba(0, 0, 0, 0.5);
+    position: relative;
+    overflow: hidden;
+}
+
+.ticket-card::before {
+    content: '';
+    position: absolute;
+    top: -50px;
+    right: -50px;
+    width: 120px;
+    height: 120px;
+    background: var(--primary-glow);
+    filter: blur(40px);
+    border-radius: 50%;
+}
+
+.ticket-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.hospital-tag {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+}
+
+.live-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--success);
+    box-shadow: 0 0 8px var(--success);
+}
+
+.room-tag {
+    background: rgba(56, 189, 248, 0.15);
+    color: var(--primary);
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+.token-section {
+    text-align: center;
+    padding: 12px 0;
+}
+
+.token-label {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.token-number {
+    font-size: 3.6rem;
+    font-weight: 800;
+    color: var(--primary);
+    line-height: 1;
+    margin: 6px 0;
+    text-shadow: 0 0 20px var(--primary-glow);
+}
+
+.doctor-name {
+    font-size: 0.88rem;
+    color: var(--text-main);
+    font-weight: 600;
+}
+
+.queue-counter-row {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    background: rgba(0, 0, 0, 0.3);
+    padding: 12px;
+    border-radius: var(--radius-md);
+    margin: 16px 0;
+}
+
+.counter-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.counter-box .label {
+    font-size: 0.7rem;
+    color: var(--text-muted);
+}
+
+.counter-box .value {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: #fff;
+    margin-top: 2px;
+}
+
+.counter-divider {
+    width: 1px;
+    height: 24px;
+    background: var(--border-color);
+}
+
+.queue-status-banner {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px;
+    border-radius: var(--radius-sm);
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+.status-in-consultation {
+    background: rgba(52, 211, 153, 0.2);
+    color: var(--success);
+    border: 1px solid rgba(52, 211, 153, 0.3);
+}
+
+.ticket-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    border-top: 1px dashed var(--border-color);
+    padding-top: 12px;
+    margin-top: 12px;
+}
+
+.btn-text {
+    background: none;
+    border: none;
+    color: var(--primary);
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-family: var(--font);
+}
+
+/* Quick Services Grid */
+.quick-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-top: 12px;
+}
+
+.quick-card {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+}
+
+.icon-circle {
+    width: 48px;
+    height: 48px;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+}
+
+.icon-circle.blue { background: rgba(56, 189, 248, 0.15); color: var(--primary); }
+.icon-circle.green { background: rgba(52, 211, 153, 0.15); color: var(--success); }
+.icon-circle.purple { background: rgba(168, 85, 247, 0.15); color: #C084FC; }
+.icon-circle.orange { background: rgba(251, 191, 36, 0.15); color: var(--warning); }
+
+.quick-card span {
+    font-size: 0.72rem;
+    color: var(--text-muted);
+    text-align: center;
+    font-weight: 500;
+}
+
+.section-title {
+    font-size: 1rem;
+    font-weight: 700;
+}
+
+/* Doctor List Card */
+.doctor-card-item {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    padding: 16px;
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 12px;
+}
+
+.doc-info h5 {
+    font-size: 0.95rem;
+    font-weight: 700;
+}
+
+.doc-info p {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    margin-top: 2px;
+}
+
+.btn-book {
+    background: linear-gradient(135deg, var(--primary), #0284C7);
+    color: #fff;
+    border: none;
+    padding: 8px 14px;
+    border-radius: var(--radius-sm);
+    font-family: var(--font);
+    font-size: 0.8rem;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+/* Bottom Nav Bar */
+.bottom-nav {
+    height: 70px;
+    background: rgba(15, 23, 42, 0.95);
+    border-top: 1px solid var(--border-color);
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    padding-bottom: 8px;
+}
+
+.nav-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    font-family: var(--font);
+    font-size: 0.7rem;
+    cursor: pointer;
+}
+
+.nav-btn.active {
+    color: var(--primary);
+}
+
+/* Modal Overlay */
+.modal-overlay {
+    display: none;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(8px);
+    z-index: 99;
+    align-items: flex-end;
+}
+
+.modal-content {
+    width: 100%;
+    /* BUG 39 FIX: cap height so tall forms (auth register, booking) scroll within
+       the phone frame instead of being truncated by .mobile-container's bounds */
+    max-height: 85%;
+    overflow-y: auto;
+    padding: 24px;
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    background: #0F172A;
+    border-top: 1px solid var(--primary-glow);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.close-btn {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 1.5rem;
+    cursor: pointer;
+}
+
+.slot-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.slot-btn {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-color);
+    color: var(--text-main);
+    padding: 10px;
+    border-radius: var(--radius-sm);
+    font-family: var(--font);
+    font-size: 0.8rem;
+    cursor: pointer;
+}
+
+.slot-btn.active {
+    background: var(--primary);
+    color: #fff;
+    border-color: var(--primary);
+}
+
+.slot-btn:disabled, .slot-btn.booked {
+    opacity: 0.35;
+    cursor: not-allowed;
+    background: rgba(255, 255, 255, 0.02);
+    border-color: rgba(255, 255, 255, 0.05);
+    color: var(--text-muted);
+    text-decoration: line-through;
+}
+
+.btn-block {
+    width: 100%;
+    padding: 14px;
+    margin-top: 20px;
+    background: linear-gradient(135deg, var(--primary), #0284C7);
+    color: #fff;
+    border: none;
+    border-radius: var(--radius-md);
+    font-family: var(--font);
+    font-size: 0.95rem;
+    font-weight: 700;
+    cursor: pointer;
+}
