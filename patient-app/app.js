@@ -1,5 +1,5 @@
 // Patient App State & Authentication
-const API_BASE = 'http://localhost:8080/api/v1';
+const API_BASE = 'https://hospital-queue-system-production.up.railway.app/api/v1';
 const PATIENT_AUTH_KEY = 'mediflow_patient_auth';
 
 let currentHospitalId = null; // BUG 34 FIX: set from auth.hospitalId only — never mutated client-side
@@ -524,7 +524,7 @@ function connectWebSocket() {
     try {
         const auth = getPatientAuth();
         const headers = auth && auth.token ? { 'Authorization': 'Bearer ' + auth.token } : {};
-        const socket = new SockJS('http://localhost:8080/ws-queue');
+        const socket = new SockJS('https://hospital-queue-system-production.up.railway.app/ws-queue');
         stompClient = Stomp.over(socket);
         stompClient.debug = null;
 

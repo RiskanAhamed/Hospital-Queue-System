@@ -1,5 +1,5 @@
 // Global App State
-const API_BASE = 'http://localhost:8080/api/v1';
+const API_BASE = 'https://hospital-queue-system-production.up.railway.app/api/v1';
 let currentHospitalId = 'HOSP001_ID'; // Will be overridden from JWT auth
 let currentDoctorId = '';
 let stompClient = null;
@@ -342,7 +342,7 @@ function connectWebSocket() {
     try {
         const auth = getAuth();
         const headers = auth && auth.token ? { 'Authorization': 'Bearer ' + auth.token } : {};
-        const socket = new SockJS('http://localhost:8080/ws-queue');
+        const socket = new SockJS('https://hospital-queue-system-production.up.railway.app/ws-queue');
         stompClient = Stomp.over(socket);
         stompClient.debug = null; // Quiet console
 
