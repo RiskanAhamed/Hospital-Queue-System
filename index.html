@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MediFlow - Hospital Queue & Appointment System</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary: #2563eb;
+            --primary-dark: #1d4ed8;
+            --primary-light: #60a5fa;
+            --accent: #06b6d4;
+            --bg-dark: #0f172a;
+            --card-bg: rgba(30, 41, 59, 0.7);
+            --card-border: rgba(255, 255, 255, 0.08);
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --success: #10b981;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem 1.5rem;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        /* Background Glow Orbs */
+        .glow-orb-1 {
+            position: absolute;
+            top: -10%;
+            left: 20%;
+            width: 500px;
+            height: 500px;
+            background: radial-gradient(circle, rgba(37, 99, 235, 0.25) 0%, rgba(15, 23, 42, 0) 70%);
+            border-radius: 50%;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .glow-orb-2 {
+            position: absolute;
+            bottom: -10%;
+            right: 15%;
+            width: 450px;
+            height: 450px;
+            background: radial-gradient(circle, rgba(6, 182, 212, 0.2) 0%, rgba(15, 23, 42, 0) 70%);
+            border-radius: 50%;
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        .container {
+            max-width: 1100px;
+            width: 100%;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2.5rem;
+        }
+
+        .header {
+            text-align: center;
+            max-width: 700px;
+        }
+
+        .badge-live {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.4rem 1rem;
+            border-radius: 9999px;
+            background: rgba(16, 185, 129, 0.15);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            color: #34d399;
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 1.25rem;
+            box-shadow: 0 0 15px rgba(16, 185, 129, 0.2);
+        }
+
+        .pulse-dot {
+            width: 8px;
+            height: 8px;
+            background-color: var(--success);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+            70% { transform: scale(1); box-shadow: 0 0 0 8px rgba(16, 185, 129, 0); }
+            100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+        }
+
+        h1 {
+            font-size: 2.75rem;
+            font-weight: 800;
+            line-height: 1.2;
+            margin-bottom: 1rem;
+            background: linear-gradient(135deg, #ffffff 0%, #94a3b8 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .header p {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+            line-height: 1.6;
+        }
+
+        .grid-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 1.75rem;
+            width: 100%;
+        }
+
+        .portal-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-radius: 1.25rem;
+            padding: 2rem;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .portal-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, transparent, transparent);
+            transition: all 0.3s ease;
+        }
+
+        .portal-card:hover {
+            transform: translateY(-6px);
+            border-color: rgba(96, 165, 250, 0.4);
+            box-shadow: 0 20px 30px -10px rgba(0, 0, 0, 0.5), 0 0 25px -5px rgba(37, 99, 235, 0.2);
+        }
+
+        .portal-card.patient:hover::before {
+            background: linear-gradient(90deg, var(--accent), var(--primary));
+        }
+
+        .portal-card.admin:hover::before {
+            background: linear-gradient(90deg, #8b5cf6, #ec4899);
+        }
+
+        .card-icon-wrap {
+            width: 60px;
+            height: 60px;
+            border-radius: 1rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .patient .card-icon-wrap {
+            background: rgba(6, 182, 212, 0.15);
+            color: var(--accent);
+            border: 1px solid rgba(6, 182, 212, 0.25);
+        }
+
+        .admin .card-icon-wrap {
+            background: rgba(139, 92, 246, 0.15);
+            color: #a78bfa;
+            border: 1px solid rgba(139, 92, 246, 0.25);
+        }
+
+        .card-title {
+            font-size: 1.4rem;
+            font-weight: 700;
+            margin-bottom: 0.75rem;
+            color: #ffffff;
+        }
+
+        .card-desc {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            line-height: 1.5;
+            margin-bottom: 2rem;
+            flex-grow: 1;
+        }
+
+        .card-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.75rem;
+            padding: 0.9rem 1.5rem;
+            border-radius: 0.75rem;
+            font-weight: 600;
+            font-size: 0.95rem;
+            transition: all 0.2s ease;
+        }
+
+        .patient .card-btn {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--accent) 100%);
+            color: white;
+        }
+
+        .admin .card-btn {
+            background: linear-gradient(135deg, #7c3aed 0%, #db2777 100%);
+            color: white;
+        }
+
+        .card-btn i {
+            transition: transform 0.2s ease;
+        }
+
+        .portal-card:hover .card-btn i {
+            transform: translateX(4px);
+        }
+
+        .demo-accounts {
+            background: rgba(15, 23, 42, 0.8);
+            border: 1px solid var(--card-border);
+            border-radius: 1rem;
+            padding: 1.5rem 2rem;
+            width: 100%;
+            max-width: 900px;
+        }
+
+        .demo-accounts h3 {
+            font-size: 1rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 1rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .accounts-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 1rem;
+        }
+
+        .account-chip {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 0.6rem;
+            padding: 0.75rem 1rem;
+        }
+
+        .account-role {
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--primary-light);
+            margin-bottom: 0.25rem;
+        }
+
+        .account-creds {
+            font-size: 0.85rem;
+            color: #cbd5e1;
+            font-family: monospace;
+        }
+
+        footer {
+            margin-top: 2rem;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="glow-orb-1"></div>
+    <div class="glow-orb-2"></div>
+
+    <div class="container">
+        <div class="header">
+            <div class="badge-live">
+                <span class="pulse-dot"></span>
+                <span>Live Backend Connected</span>
+            </div>
+            <h1>MediFlow Hospital Queue & Appointments</h1>
+            <p>Smart multi-tenant SaaS healthcare platform for hospital queue management, real-time doctor appointment booking, and automated tokens.</p>
+        </div>
+
+        <div class="grid-cards">
+            <!-- Patient App Card -->
+            <a href="./patient-app/" class="portal-card patient">
+                <div>
+                    <div class="card-icon-wrap">
+                        <i class="fa-solid fa-hospital-user"></i>
+                    </div>
+                    <div class="card-title">Patient Portal App</div>
+                    <div class="card-desc">Book doctor appointments, track live queue token numbers, view estimated waiting times, and get real-time call notifications.</div>
+                </div>
+                <div class="card-btn">
+                    <span>Launch Patient Portal</span>
+                    <i class="fa-solid fa-arrow-right"></i>
+                </div>
+            </a>
+
+            <!-- Hospital Staff & Admin Card -->
+            <a href="./web-admin/login.html" class="portal-card admin">
+                <div>
+                    <div class="card-icon-wrap">
+                        <i class="fa-solid fa-user-doctor"></i>
+                    </div>
+                    <div class="card-title">Hospital Admin & Doctor Portal</div>
+                    <div class="card-desc">Doctor consultation desk, staff check-in manager, queue calling controls, department statistics, and hospital management.</div>
+                </div>
+                <div class="card-btn">
+                    <span>Launch Admin & Doctor Portal</span>
+                    <i class="fa-solid fa-arrow-right"></i>
+                </div>
+            </a>
+        </div>
+
+        <!-- Demo Credentials -->
+        <div class="demo-accounts">
+            <h3><i class="fa-solid fa-key"></i> Pre-configured Demo Accounts</h3>
+            <div class="accounts-grid">
+                <div class="account-chip">
+                    <div class="account-role">👑 SUPER ADMIN</div>
+                    <div class="account-creds">superadmin@mediflow.com<br>superadmin123</div>
+                </div>
+                <div class="account-chip">
+                    <div class="account-role">🏥 HOSPITAL ADMIN</div>
+                    <div class="account-creds">admin@citycare.org<br>admin123</div>
+                </div>
+                <div class="account-chip">
+                    <div class="account-role">👨‍⚕️ DOCTOR (Cardiology)</div>
+                    <div class="account-creds">dr.vance@citycare.org<br>doctor123</div>
+                </div>
+                <div class="account-chip">
+                    <div class="account-role">🧑‍💼 DESK STAFF</div>
+                    <div class="account-creds">staff@citycare.org<br>staff123</div>
+                </div>
+            </div>
+        </div>
+
+        <footer>
+            MediFlow Multi-Tenant Hospital Queue Management System &copy; 2026
+        </footer>
+    </div>
+</body>
+</html>
