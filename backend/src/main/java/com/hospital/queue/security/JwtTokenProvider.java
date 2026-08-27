@@ -26,11 +26,13 @@ public class JwtTokenProvider {
         Date now = new Date();
         Date expiryDate = new Date(now.getTime() + jwtExpirationMs);
 
-        return Jwts.builder()
-                .setSubject(userId)
-                .claim("email", email)
-                .claim("role", role)
-                .claim("hospitalId", hospitalId)
+        JwtBuilder builder = Jwts.builder()
+                .setSubject(userId != null ? userId : "")
+                .claim("email", email != null ? email : "")
+                .claim("role", role != null ? role : "PATIENT")
+                .claim("hospitalId", hospitalId != null ? hospitalId : "");
+
+        return builder
                 .setIssuedAt(now)
                 .setExpiration(expiryDate)
                 .signWith(getSigningKey(), SignatureAlgorithm.HS256)
