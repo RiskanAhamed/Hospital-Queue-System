@@ -1,0 +1,1079 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  RefreshControl,
+  FlatList,
+  TextInput,
+  ActivityIndicator,
+  Alert,
+  Platform,
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '../../context/AuthContext';
+import { authFetch, API_BASE } from '../../utils/api';
+import {
+  connectWebSocket,
+  subscribeToQueue,
+  subscribeToNotifications,
+  disconnectWebSocket,
+  unsubscribeFromQueue,
+} from '../../utils/websocket';
+import { useRouter } from 'expo-router';
+import { useIsFocused } from '@react-navigation/native';
+
+interface Doctor {
+  id: string;
+  name: string;
+  departmentId: string;
+  departmentName: string;
+  roomNumber: string;
+  status: string; // e.g. AVAILABLE, BUSY, AWAY
+  availableSlots: string[];
+}
+
+interface Department {
+  id: string;
+  name: string;
+}
+
+interface Appointment {
+  id: string;
+  patientId: string;
+  doctorId: string;
+  doctorName: string;
+  departmentName: string;
+  appointmentDate: string;
+  timeSlot: string;
+  queueNumber: string;
+  status: 'BOOKED' | 'CHECKED_IN' | 'WAITING' | 'CALLED' | 'IN_CONSULTATION' | 'COMPLETED' | 'CANCELLED';
+}
+
+export default function HomeScreen() {
+  const { user, hospitalId, hospitalName, updateHospitalName, token } = useAuth();
+  const router = useRouter();
+  const isFocused = useIsFocused();
+
+  const [refreshing, setRefreshing] = useState(false);
+  const [doctors, setDoctors] = useState<Doctor[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [activeAppointment, setActiveAppointment] = useState<Appointment | null>(null);
+  
+  // Real-time Queue details
+  const [currentlyServing, setCurrentlyServing] = useState('--');
+  const [peopleAhead, setPeopleAhead] = useState<number | string>('--');
+  const [estWaitTime, setEstWaitTime] = useState('--');
+  const [queueBannerText, setQueueBannerText] = useState('Select a doctor below to book an appointment');
+  const [queueBannerStyle, setQueueBannerStyle] = useState('info'); // info, waiting, called, completed
+
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedDeptId, setSelectedDeptId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  // Load all initial details
+  const loadData = useCallback(async () => {
+    if (!hospitalId || !user?.userId) return;
+
+    try {
+      // 1. Fetch Hospital Info
+      const hospRes = await authFetch(`/hospitals/${hospitalId}`);
+      if (hospRes.ok) {
+        const hosp = await hospRes.json();
+        if (hosp && hosp.name && hosp.name !== hospitalName) {
+          await updateHospitalName(hosp.name);
+        }
+      }
+
+      // 2. Fetch Departments
+      const deptRes = await authFetch(`/hospitals/${hospitalId}/departments`);
+      if (deptRes.ok) {
+        const depts = await deptRes.json();
+        setDepartments(depts || []);
+      }
+
+      // 3. Fetch Doctors
+      const docRes = await authFetch(`/hospitals/${hospitalId}/doctors`);
+      if (docRes.ok) {
+        const docs = await docRes.json();
+        setDoctors(docs || []);
+      }
+
+      // 4. Fetch Active Appointment
+      const apptRes = await authFetch(`/hospitals/${hospitalId}/appointments?patientId=${user.userId}`);
+      if (apptRes.ok) {
+        const appts: Appointment[] = await apptRes.json();
+        const active = appts.find(
+          (a) =>
+            a.status === 'BOOKED' ||
+            a.status === 'CHECKED_IN' ||
+            a.status === 'WAITING' ||
+            a.status === 'CALLED' ||
+            a.status === 'IN_CONSULTATION'
+        );
+        setActiveAppointment(active || null);
+        
+        if (!active) {
+          // Reset real-time fields
+          setCurrentlyServing('--');
+          setPeopleAhead('--');
+          setEstWaitTime('--');
+          setQueueBannerText('Select a doctor below to book an appointment');
+          setQueueBannerStyle('info');
+          unsubscribeFromQueue();
+        } else {
+          // Fetch static queue summary immediately
+          fetchStaticQueueSummary(active.doctorId);
+        }
+      }
+
+      // 5. Fetch Notification Unread Count
+      const notifRes = await authFetch(`/hospitals/${hospitalId}/notifications/unread-count`);
+      if (notifRes.ok) {
+        const count = await notifRes.json();
+        setUnreadNotifications(count || 0);
+      }
+    } catch (error) {
+      console.error('Error loading home data:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [hospitalId, user?.userId, hospitalName]);
+
+  const fetchStaticQueueSummary = async (doctorId: string) => {
+    try {
+      const res = await authFetch(`/hospitals/${hospitalId}/queues/doctor/${doctorId}`);
+      if (res.ok) {
+        const summary = await res.json();
+        if (summary) updateQueueDetails(summary);
+      }
+    } catch (e) {
+      console.error('Error fetching static queue summary:', e);
+    }
+  };
+
+  const updateQueueDetails = useCallback((summary: any) => {
+    if (!summary) return;
+    const serving = summary.currentlyServingToken || '--';
+    setCurrentlyServing(serving);
+
+    if (!activeAppointment) return;
+    const myToken = activeAppointment.queueNumber;
+    const entries = summary.entries || [];
+    const myEntry = entries.find((e: any) => e.queueNumber === myToken || e.id === activeAppointment.id);
+
+    const doc = doctors.find((d) => d.id === (summary.doctorId || activeAppointment.doctorId));
+    const roomName = doc?.roomNumber ? `Room ${doc.roomNumber}` : 'Doctor Room';
+
+    if (serving === myToken || (myEntry && (myEntry.status === 'CALLED' || myEntry.status === 'IN_CONSULTATION'))) {
+      setPeopleAhead(0);
+      setEstWaitTime('Now!');
+      setQueueBannerStyle('called');
+      setQueueBannerText(`Your turn! Please enter ${roomName}`);
+    } else if (myEntry && myEntry.status === 'COMPLETED') {
+      setPeopleAhead(0);
+      setEstWaitTime('Done');
+      setQueueBannerStyle('completed');
+      setQueueBannerText('Consultation Completed. Thank you!');
+    } else {
+      const waitingEntries = entries.filter((e: any) => e.status === 'WAITING');
+      const myIndex = waitingEntries.findIndex((e: any) => e.queueNumber === myToken);
+      const aheadCount = myIndex >= 0 ? myIndex : waitingEntries.length;
+      const waitStr = aheadCount === 0 ? 'Next up!' : `${aheadCount * 10} mins`;
+
+      setPeopleAhead(aheadCount);
+      setEstWaitTime(waitStr);
+      setQueueBannerStyle('waiting');
+      setQueueBannerText(`Waiting in queue (${aheadCount} patient${aheadCount !== 1 ? 's' : ''} ahead)`);
+    }
+  }, [activeAppointment, doctors]);
+
+  // Hook up WebSockets
+  useEffect(() => {
+    if (!token || !hospitalId || !isFocused) return;
+
+    const stompClient = connectWebSocket(token, () => {
+      // Subscribe to unread notifications
+      if (user?.userId) {
+        subscribeToNotifications(hospitalId, user.userId, () => {
+          loadData();
+        });
+      }
+
+      // Subscribe to queue topic if active ticket exists
+      if (activeAppointment) {
+        subscribeToQueue(hospitalId, activeAppointment.doctorId, (summary) => {
+          updateQueueDetails(summary);
+        });
+      } else {
+        unsubscribeFromQueue();
+      }
+    });
+
+    return () => {
+      if (!isFocused) {
+        // Disconnect websocket when tab is completely blurred (reduces server load)
+        disconnectWebSocket();
+      }
+    };
+  }, [token, hospitalId, activeAppointment, user?.userId, isFocused, updateQueueDetails]);
+
+  // Initial and refocus load
+  useEffect(() => {
+    if (isFocused) {
+      loadData();
+    }
+  }, [isFocused]);
+
+  const onRefresh = () => {
+    setRefreshing(true);
+    loadData();
+  };
+
+  const handleCancelAppointment = () => {
+    if (!activeAppointment) return;
+    Alert.alert(
+      'Cancel Appointment',
+      'Are you sure you want to cancel this appointment?',
+      [
+        { text: 'No', style: 'cancel' },
+        {
+          text: 'Yes, Cancel',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const res = await authFetch(
+                `/hospitals/${hospitalId}/appointments/${activeAppointment.id}/cancel`,
+                { method: 'POST' }
+              );
+              if (res.ok) {
+                Alert.alert('Cancelled', 'Your appointment has been cancelled successfully.');
+                loadData();
+              } else {
+                const text = await res.text();
+                Alert.alert('Error', text || 'Could not cancel appointment.');
+              }
+            } catch (e) {
+              Alert.alert('Error', 'Connection error.');
+            }
+          },
+        },
+      ]
+    );
+  };
+
+  // Filtered doctors
+  const filteredDoctors = doctors.filter((doc) => {
+    const matchesSearch = doc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      doc.departmentName.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesDept = selectedDeptId ? doc.departmentId === selectedDeptId : true;
+    return matchesSearch && matchesDept;
+  });
+
+  const getInitials = (name: string) => {
+    if (!name) return '??';
+    return name
+      .split(' ')
+      .map((n) => n[0])
+      .join('')
+      .toUpperCase()
+      .substring(0, 2);
+  };
+
+  if (loading && !refreshing) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#38BDF8" />
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.container}>
+      {/* Header bar */}
+      <View style={styles.header}>
+        <View style={styles.userSection}>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>{getInitials(user?.name || '')}</Text>
+          </View>
+          <View>
+            <Text style={styles.greetingSub}>Welcome back,</Text>
+            <Text style={styles.userName}>{user?.name || 'Patient'}</Text>
+          </View>
+        </View>
+
+        <View style={styles.headerActions}>
+          <View style={styles.hospitalPill}>
+            <Ionicons name="business" size={14} color="#38BDF8" style={{ marginRight: 4 }} />
+            <Text style={styles.hospitalText} numberOfLines={1}>
+              {hospitalName || 'My Hospital'}
+            </Text>
+          </View>
+
+          <TouchableOpacity
+            style={styles.bellButton}
+            onPress={() => router.push('/notifications')}
+          >
+            <Ionicons name="notifications" size={20} color="#94A3B8" />
+            {unreadNotifications > 0 && (
+              <View style={styles.bellDot} />
+            )}
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      >
+        {/* Ticket card section */}
+        <View style={styles.ticketSection}>
+          <View style={styles.ticketCard}>
+            <View style={styles.ticketHeader}>
+              <View style={styles.hospitalTag}>
+                <View style={styles.liveIndicator} />
+                <Text style={styles.hospitalTagText} numberOfLines={1}>
+                  {hospitalName || 'City Care General'}
+                </Text>
+              </View>
+              <Text style={styles.roomTag}>
+                {activeAppointment ? `Room ${doctors.find(d => d.id === activeAppointment.doctorId)?.roomNumber || '302'}` : 'Room --'}
+              </Text>
+            </View>
+
+            <View style={styles.ticketBody}>
+              <Text style={styles.tokenLabel}>Your Queue Token</Text>
+              <Text style={styles.tokenNumber}>
+                {activeAppointment ? activeAppointment.queueNumber : '--'}
+              </Text>
+              <Text style={styles.doctorName}>
+                {activeAppointment
+                  ? `${activeAppointment.doctorName} (${activeAppointment.departmentName})`
+                  : 'No active booking'}
+              </Text>
+
+              {/* Counters row */}
+              <View style={styles.countersRow}>
+                <View style={styles.counterBox}>
+                  <Text style={styles.counterLabel}>Currently Serving</Text>
+                  <Text style={styles.counterValue}>{currentlyServing}</Text>
+                </View>
+                <View style={styles.divider} />
+                <View style={styles.counterBox}>
+                  <Text style={styles.counterLabel}>People Ahead</Text>
+                  <Text style={styles.counterValue}>{peopleAhead}</Text>
+                </View>
+                <View style={styles.divider} />
+                <View style={styles.counterBox}>
+                  <Text style={styles.counterLabel}>Est. Wait Time</Text>
+                  <Text style={styles.counterValue}>{estWaitTime}</Text>
+                </View>
+              </View>
+
+              {/* Banner */}
+              <View
+                style={[
+                  styles.banner,
+                  queueBannerStyle === 'called' && styles.bannerCalled,
+                  queueBannerStyle === 'completed' && styles.bannerCompleted,
+                  queueBannerStyle === 'waiting' && styles.bannerWaiting,
+                ]}
+              >
+                <Ionicons
+                  name={
+                    queueBannerStyle === 'called'
+                      ? 'megaphone'
+                      : queueBannerStyle === 'completed'
+                      ? 'checkmark-circle'
+                      : 'pulse'
+                  }
+                  size={16}
+                  color={
+                    queueBannerStyle === 'called'
+                      ? '#C084FC'
+                      : queueBannerStyle === 'completed'
+                      ? '#34D399'
+                      : queueBannerStyle === 'waiting'
+                      ? '#FBBF24'
+                      : '#94A3B8'
+                  }
+                  style={{ marginRight: 6 }}
+                />
+                <Text
+                  style={[
+                    styles.bannerText,
+                    queueBannerStyle === 'called' && styles.bannerTextCalled,
+                    queueBannerStyle === 'completed' && styles.bannerTextCompleted,
+                    queueBannerStyle === 'waiting' && styles.bannerTextWaiting,
+                  ]}
+                  numberOfLines={2}
+                >
+                  {queueBannerText}
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.ticketFooter}>
+              <View style={styles.scheduleInfo}>
+                <Ionicons name="time-outline" size={14} color="#94A3B8" style={{ marginRight: 4 }} />
+                <Text style={styles.scheduleText} numberOfLines={1}>
+                  Scheduled:{' '}
+                  {activeAppointment
+                    ? `${activeAppointment.appointmentDate} ${activeAppointment.timeSlot}`
+                    : 'None'}
+                </Text>
+              </View>
+
+              {activeAppointment && (
+                <TouchableOpacity
+                  style={styles.cancelBtn}
+                  onPress={handleCancelAppointment}
+                >
+                  <Ionicons name="close-circle-outline" size={14} color="#F87171" style={{ marginRight: 4 }} />
+                  <Text style={styles.cancelBtnText}>Cancel</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        </View>
+
+        {/* Quick action grid */}
+        <View style={styles.sectionBlock}>
+          <Text style={styles.sectionTitle}>Quick Services</Text>
+          <View style={styles.quickGrid}>
+            <TouchableOpacity
+              style={styles.quickCard}
+              onPress={() => setSelectedDeptId(null)} // resets filters
+            >
+              <View style={[styles.iconCircle, styles.circleBlue]}>
+                <Ionicons name="calendar-outline" size={20} color="#38BDF8" />
+              </View>
+              <Text style={styles.quickCardText}>Book Appointment</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.quickCard}
+              onPress={() => router.push('/(tabs)/queue')}
+            >
+              <View style={[styles.iconCircle, styles.circleGreen]}>
+                <Ionicons name="people-outline" size={20} color="#34D399" />
+              </View>
+              <Text style={styles.quickCardText}>Live Queue Tracker</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.quickCard}
+              onPress={() => {
+                // Focus / filter departments
+                setSelectedDeptId(null);
+              }}
+            >
+              <View style={[styles.iconCircle, styles.circlePurple]}>
+                <Ionicons name="grid-outline" size={20} color="#A855F7" />
+              </View>
+              <Text style={styles.quickCardText}>Departments</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.quickCard}
+              onPress={() => router.push('/(tabs)/appointments')}
+            >
+              <View style={[styles.iconCircle, styles.circleOrange]}>
+                <Ionicons name="file-tray-full-outline" size={20} color="#FB923C" />
+              </View>
+              <Text style={styles.quickCardText}>My Records</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Departments Filter Block */}
+        <View style={styles.sectionBlock}>
+          <Text style={styles.sectionTitle}>Medical Departments</Text>
+          <Text style={styles.sectionSubtitle}>Tap a department to filter doctors below</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.pillsContainer}
+          >
+            <TouchableOpacity
+              style={[styles.pill, selectedDeptId === null && styles.pillActive]}
+              onPress={() => setSelectedDeptId(null)}
+            >
+              <Text style={[styles.pillText, selectedDeptId === null && styles.pillTextActive]}>
+                All Doctors
+              </Text>
+            </TouchableOpacity>
+            {departments.map((dept) => (
+              <TouchableOpacity
+                key={dept.id}
+                style={[styles.pill, selectedDeptId === dept.id && styles.pillActive]}
+                onPress={() => setSelectedDeptId(dept.id)}
+              >
+                <Text style={[styles.pillText, selectedDeptId === dept.id && styles.pillTextActive]}>
+                  {dept.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+
+        {/* Doctors block */}
+        <View style={[styles.sectionBlock, { marginBottom: 30 }]}>
+          <View style={styles.doctorsHeader}>
+            <Text style={styles.sectionTitle}>Available Doctors</Text>
+          </View>
+
+          {/* Search bar */}
+          <View style={styles.searchBar}>
+            <Ionicons name="search" size={18} color="#94A3B8" style={{ marginRight: 8 }} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Search by doctor or specialty..."
+              placeholderTextColor="#64748B"
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity onPress={() => setSearchQuery('')}>
+                <Ionicons name="close" size={18} color="#94A3B8" />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {filteredDoctors.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Ionicons name="search-outline" size={48} color="#64748B" />
+              <Text style={styles.emptyText}>No available doctors match your criteria.</Text>
+            </View>
+          ) : (
+            filteredDoctors.map((doc) => (
+              <TouchableOpacity
+                key={doc.id}
+                style={styles.doctorCard}
+                onPress={() => router.push({
+                  pathname: '/booking',
+                  params: { doctorId: doc.id, doctorName: doc.name, specialty: doc.departmentName, roomNumber: doc.roomNumber }
+                })}
+              >
+                <View style={styles.docHeader}>
+                  <View style={styles.docInfo}>
+                    <Text style={styles.docName}>{doc.name}</Text>
+                    <Text style={styles.docSpecialty}>{doc.departmentName}</Text>
+                  </View>
+                  <View
+                    style={[
+                      styles.statusIndicator,
+                      doc.status === 'AVAILABLE' && styles.statusAvailable,
+                      doc.status === 'BUSY' && styles.statusBusy,
+                      doc.status === 'AWAY' && styles.statusAway,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.statusText,
+                        doc.status === 'AVAILABLE' && styles.statusTextAvailable,
+                        doc.status === 'BUSY' && styles.statusTextBusy,
+                        doc.status === 'AWAY' && styles.statusTextAway,
+                      ]}
+                    >
+                      {doc.status}
+                    </Text>
+                  </View>
+                </View>
+
+                <View style={styles.docDetailsRow}>
+                  <View style={styles.docDetailCell}>
+                    <Ionicons name="business-outline" size={14} color="#94A3B8" style={{ marginRight: 4 }} />
+                    <Text style={styles.docDetailText}>Room {doc.roomNumber}</Text>
+                  </View>
+                  <View style={styles.docDetailCell}>
+                    <Ionicons name="calendar-outline" size={14} color="#94A3B8" style={{ marginRight: 4 }} />
+                    <Text style={styles.docDetailText}>
+                      {doc.availableSlots ? `${doc.availableSlots.length} daily slots` : 'No slots'}
+                    </Text>
+                  </View>
+                </View>
+
+                <TouchableOpacity
+                  style={styles.btnBook}
+                  onPress={() => router.push({
+                    pathname: '/booking',
+                    params: { doctorId: doc.id, doctorName: doc.name, specialty: doc.departmentName, roomNumber: doc.roomNumber }
+                  })}
+                >
+                  <Text style={styles.btnBookText}>Book Appointment</Text>
+                </TouchableOpacity>
+              </TouchableOpacity>
+            ))
+          )}
+        </View>
+      </ScrollView>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#090D16',
+    paddingTop: Platform.OS === 'ios' ? 50 : 20,
+  },
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: '#090D16',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  userSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  avatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#1E293B',
+    borderColor: '#38BDF8',
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  avatarText: {
+    color: '#38BDF8',
+    fontWeight: '700',
+    fontSize: 14,
+  },
+  greetingSub: {
+    fontSize: 11,
+    color: '#94A3B8',
+  },
+  userName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#F8FAFC',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  hospitalPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(56, 189, 248, 0.08)',
+    borderColor: 'rgba(56, 189, 248, 0.2)',
+    borderWidth: 1,
+    borderRadius: 20,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    marginRight: 8,
+    maxWidth: 120,
+  },
+  hospitalText: {
+    color: '#38BDF8',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  bellButton: {
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1,
+    borderRadius: 20,
+    padding: 6,
+    position: 'relative',
+  },
+  bellDot: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#EF4444',
+  },
+  scrollContent: {
+    padding: 16,
+  },
+  ticketSection: {
+    marginBottom: 20,
+  },
+  ticketCard: {
+    width: '100%',
+    backgroundColor: 'rgba(26, 36, 56, 0.75)',
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    overflow: 'hidden',
+    shadowColor: '#38BDF8',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.05,
+    shadowRadius: 16,
+  },
+  ticketHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.15)',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.04)',
+  },
+  hospitalTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    maxWidth: '65%',
+  },
+  liveIndicator: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#34D399',
+    marginRight: 6,
+  },
+  hospitalTagText: {
+    color: '#94A3B8',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  roomTag: {
+    color: '#38BDF8',
+    fontSize: 11,
+    fontWeight: '700',
+    backgroundColor: 'rgba(56, 189, 248, 0.1)',
+    borderRadius: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  ticketBody: {
+    padding: 16,
+    alignItems: 'center',
+  },
+  tokenLabel: {
+    fontSize: 12,
+    color: '#94A3B8',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  tokenNumber: {
+    fontSize: 32,
+    fontWeight: '800',
+    color: '#F8FAFC',
+    marginVertical: 4,
+  },
+  doctorName: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#F8FAFC',
+    marginBottom: 16,
+  },
+  countersRow: {
+    flexDirection: 'row',
+    width: '100%',
+    justifyContent: 'space-around',
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.04)',
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.04)',
+    paddingVertical: 12,
+    marginBottom: 12,
+  },
+  counterBox: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  counterLabel: {
+    fontSize: 10,
+    color: '#94A3B8',
+    marginBottom: 4,
+  },
+  counterValue: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#F8FAFC',
+  },
+  divider: {
+    width: 1,
+    height: '80%',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    alignSelf: 'center',
+  },
+  banner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.06)',
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    width: '100%',
+  },
+  bannerWaiting: {
+    backgroundColor: 'rgba(251, 191, 36, 0.06)',
+    borderColor: 'rgba(251, 191, 36, 0.15)',
+  },
+  bannerCalled: {
+    backgroundColor: 'rgba(168, 85, 247, 0.08)',
+    borderColor: 'rgba(168, 85, 247, 0.2)',
+  },
+  bannerCompleted: {
+    backgroundColor: 'rgba(52, 211, 153, 0.08)',
+    borderColor: 'rgba(52, 211, 153, 0.15)',
+  },
+  bannerText: {
+    fontSize: 11,
+    color: '#94A3B8',
+    flex: 1,
+  },
+  bannerTextWaiting: {
+    color: '#FBBF24',
+  },
+  bannerTextCalled: {
+    color: '#C084FC',
+    fontWeight: '600',
+  },
+  bannerTextCompleted: {
+    color: '#34D399',
+  },
+  ticketFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.15)',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  scheduleInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    maxWidth: '75%',
+  },
+  scheduleText: {
+    fontSize: 11,
+    color: '#94A3B8',
+  },
+  cancelBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(248, 113, 113, 0.1)',
+    borderColor: 'rgba(248, 113, 113, 0.25)',
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  cancelBtnText: {
+    color: '#F87171',
+    fontSize: 11,
+    fontWeight: '600',
+  },
+  sectionBlock: {
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: '#F8FAFC',
+    marginBottom: 4,
+  },
+  sectionSubtitle: {
+    fontSize: 11,
+    color: '#94A3B8',
+    marginBottom: 10,
+  },
+  quickGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    gap: 12,
+    marginTop: 8,
+  },
+  quickCard: {
+    width: '48%',
+    backgroundColor: 'rgba(26, 36, 56, 0.5)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 16,
+    padding: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  iconCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+  },
+  circleBlue: {
+    backgroundColor: 'rgba(56, 189, 248, 0.1)',
+  },
+  circleGreen: {
+    backgroundColor: 'rgba(52, 211, 153, 0.1)',
+  },
+  circlePurple: {
+    backgroundColor: 'rgba(168, 85, 247, 0.1)',
+  },
+  circleOrange: {
+    backgroundColor: 'rgba(251, 146, 60, 0.1)',
+  },
+  quickCardText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#F8FAFC',
+    flex: 1,
+  },
+  pillsContainer: {
+    paddingVertical: 4,
+    gap: 8,
+  },
+  pill: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+  },
+  pillActive: {
+    backgroundColor: '#38BDF8',
+    borderColor: '#38BDF8',
+  },
+  pillText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#94A3B8',
+  },
+  pillTextActive: {
+    color: '#090D16',
+  },
+  doctorsHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 12,
+    paddingHorizontal: 12,
+    height: 44,
+    marginBottom: 16,
+  },
+  searchInput: {
+    flex: 1,
+    color: '#fff',
+    fontSize: 13,
+  },
+  doctorCard: {
+    backgroundColor: 'rgba(26, 36, 56, 0.5)',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: 18,
+    padding: 16,
+    marginBottom: 12,
+  },
+  docHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+    marginBottom: 10,
+  },
+  docInfo: {
+    flex: 1,
+  },
+  docName: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#F8FAFC',
+  },
+  docSpecialty: {
+    fontSize: 12,
+    color: '#94A3B8',
+    marginTop: 2,
+  },
+  statusIndicator: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  statusAvailable: {
+    backgroundColor: 'rgba(52, 211, 153, 0.1)',
+  },
+  statusBusy: {
+    backgroundColor: 'rgba(248, 113, 113, 0.1)',
+  },
+  statusAway: {
+    backgroundColor: 'rgba(251, 191, 36, 0.1)',
+  },
+  statusText: {
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  statusTextAvailable: {
+    color: '#34D399',
+  },
+  statusTextBusy: {
+    color: '#F87171',
+  },
+  statusTextAway: {
+    color: '#FBBF24',
+  },
+  docDetailsRow: {
+    flexDirection: 'row',
+    gap: 16,
+    marginBottom: 14,
+  },
+  docDetailCell: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  docDetailText: {
+    fontSize: 12,
+    color: '#94A3B8',
+  },
+  btnBook: {
+    width: '100%',
+    height: 38,
+    borderRadius: 10,
+    backgroundColor: 'rgba(56, 189, 248, 0.08)',
+    borderColor: 'rgba(56, 189, 248, 0.25)',
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  btnBookText: {
+    color: '#38BDF8',
+    fontWeight: '600',
+    fontSize: 13,
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    paddingVertical: 32,
+  },
+  emptyText: {
+    fontSize: 12,
+    color: '#94A3B8',
+    textAlign: 'center',
+    marginTop: 8,
+  },
+});
