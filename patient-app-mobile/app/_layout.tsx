@@ -17,9 +17,27 @@ export const unstable_settings = {
   anchor: '(tabs)',
 };
 
+import { registerForPushNotificationsAsync } from '../utils/pushNotifications';
+import * as Notifications from 'expo-notifications';
+import React, { useEffect } from 'react';
+
 function AppContent() {
   const colorScheme = useColorScheme();
   const { token, loading } = useAuth();
+
+  useEffect(() => {
+    if (token) {
+      // Register device for background push notifications
+      registerForPushNotificationsAsync();
+
+      // Listen for notification taps
+      const subscription = Notifications.addNotificationResponseReceivedListener(response => {
+        console.log('User tapped on notification banner:', response.notification.request.content);
+      });
+
+      return () => subscription.remove();
+    }
+  }, [token]);
 
   if (loading) {
     return (

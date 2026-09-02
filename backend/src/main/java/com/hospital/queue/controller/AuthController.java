@@ -16,6 +16,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 import jakarta.validation.Valid;
+import com.hospital.queue.security.TenantSecurityService;
+import com.hospital.queue.security.UserPrincipal;
 import com.hospital.queue.service.AuditLogService;
 import lombok.Data;
 
@@ -38,6 +40,7 @@ public class AuthController {
     private final JwtTokenProvider tokenProvider;
     private final LoginAttemptRepository loginAttemptRepository;
     private final PasswordResetTokenRepository passwordResetTokenRepository;
+    private final TenantSecurityService tenantSecurityService;
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request) {
@@ -248,5 +251,21 @@ public class AuthController {
         auditLogService.log(user.getHospitalId(), user.getId(), "PASSWORD_RESET", "Password was reset for user: " + user.getEmail());
 
         return ResponseEntity.ok(java.util.Map.of("message", "Password reset successfully. You can now login with your new password."));
+    }
+
+    @PostMapping("/push-token")
+    public ResponseEntity<?> registerPushToken(@RequestBody java.util.Map<String, String> body) {
+        UserPrincipal currentUser = tenantSecurityService.getCurrentUser();
+        String pushToken = body.get("pushToken");
+        if (pushToken != null && !pushToken.trim().isEmpty()) {
+            User user = userRepository.findById(currentUser.getUserId()).orElse(null);
+            if (user != null) {
+                user.setPushToken(pushToken.trim());
+                userRepository.save(user);
+                log.info("Registered Expo Push Token for user {}: {}", user.getEmail(), pushToken);
+                return ResponseEntity.ok(java.util.Map.of("message", "Push token registered successfully."));
+            }
+        }
+        return ResponseEntity.badRequest().body("Invalid pushToken.");
     }
 }

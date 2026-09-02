@@ -31,4 +31,20 @@ public class Appointment {
     private String feedbackComment;
     private LocalDateTime ratedAt;
     private LocalDateTime createdAt = LocalDateTime.now();
+
+    public Appointment(String id, String hospitalId, String patientId, String patientName, String doctorId, String doctorName, String departmentId, String departmentName, String appointmentDate, String timeSlot, String queueNumber, String status, LocalDateTime createdAt) {
+        this.id = id;
+        this.hospitalId = hospitalId;
+        this.patientId = patientId;
+        this.patientName = patientName;
+        this.doctorId = doctorId;
+        this.doctorName = doctorName;
+        this.departmentId = departmentId;
+        this.departmentName = departmentName;
+        this.appointmentDate = appointmentDate;
+        this.timeSlot = timeSlot;
+        this.queueNumber = queueNumber;
+        this.status = status;
+        this.createdAt = createdAt;
+    }
 }

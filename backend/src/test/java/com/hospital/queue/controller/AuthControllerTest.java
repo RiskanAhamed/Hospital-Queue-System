@@ -33,6 +33,7 @@ public class AuthControllerTest {
     @Mock private JwtTokenProvider tokenProvider;
     @Mock private LoginAttemptRepository loginAttemptRepository;
     @Mock private PasswordResetTokenRepository passwordResetTokenRepository;
+    @Mock private com.hospital.queue.security.TenantSecurityService tenantSecurityService;
 
     private AuthController authController;
 
@@ -40,7 +41,8 @@ public class AuthControllerTest {
     void setUp() {
         authController = new AuthController(
                 auditLogService, userRepository, hospitalRepository, doctorRepository,
-                passwordEncoder, tokenProvider, loginAttemptRepository, passwordResetTokenRepository
+                passwordEncoder, tokenProvider, loginAttemptRepository, passwordResetTokenRepository,
+                tenantSecurityService
         );
     }
 
