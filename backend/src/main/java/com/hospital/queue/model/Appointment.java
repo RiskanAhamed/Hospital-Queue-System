@@ -27,5 +27,8 @@ public class Appointment {
     private String timeSlot; // HH:mm
     private String queueNumber; // e.g. CAR-12
     private String status = "BOOKED"; // BOOKED, CHECKED_IN, IN_CONSULTATION, COMPLETED, CANCELLED
+    private Integer rating; // 1 to 5 stars
+    private String feedbackComment;
+    private LocalDateTime ratedAt;
     private LocalDateTime createdAt = LocalDateTime.now();
 }

@@ -630,7 +630,15 @@ function updateLiveQueueTicket(summary) {
         let myIndex = waitingEntries.findIndex(e => e.queueNumber === myToken);
         let aheadCount = myIndex >= 0 ? myIndex : waitingEntries.length;
         const waitStr = aheadCount === 0 ? 'Next up!' : `${aheadCount * 10} mins`;
-        const statusStr = `Waiting in queue (${aheadCount} patient${aheadCount !== 1 ? 's' : ''} ahead)`;
+        
+        let statusStr = `Waiting in queue (${aheadCount} patient${aheadCount !== 1 ? 's' : ''} ahead)`;
+        if (aheadCount === 0) {
+            statusStr = `🔔 You're next in line! Please wait outside ${roomName}`;
+        } else if (aheadCount === 1) {
+            statusStr = `🔔 Almost your turn (1 ahead)! Proceed towards ${roomName}`;
+        } else if (aheadCount === 2) {
+            statusStr = `🔔 2 tokens away! Please head towards ${roomName}`;
+        }
 
         document.getElementById('peopleAheadCount').textContent = aheadCount;
         document.getElementById('estWaitTime').textContent = waitStr;

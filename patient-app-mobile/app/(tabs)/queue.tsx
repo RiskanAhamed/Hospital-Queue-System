@@ -116,10 +116,19 @@ export default function QueueScreen() {
       const aheadCount = myIndex >= 0 ? myIndex : waitingEntries.length;
       const waitStr = aheadCount === 0 ? 'Next up!' : `${aheadCount * 10} mins`;
 
+      let statusMsg = `Waiting in queue (${aheadCount} patient${aheadCount !== 1 ? 's' : ''} ahead)`;
+      if (aheadCount === 0) {
+        statusMsg = `🔔 You're next in line! Please wait outside consultation room`;
+      } else if (aheadCount === 1) {
+        statusMsg = `🔔 Almost your turn (1 ahead)! Proceed towards consultation room`;
+      } else if (aheadCount === 2) {
+        statusMsg = `🔔 2 tokens away! Please head towards the waiting area`;
+      }
+
       setPeopleAhead(aheadCount);
       setEstWaitTime(waitStr);
       setBannerStyle('waiting');
-      setBannerText(`Waiting in queue (${aheadCount} patient${aheadCount !== 1 ? 's' : ''} ahead)`);
+      setBannerText(statusMsg);
     }
   }, [activeAppointment]);
 

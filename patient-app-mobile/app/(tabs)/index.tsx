@@ -34,6 +34,8 @@ interface Doctor {
   roomNumber: string;
   status: string; // e.g. AVAILABLE, BUSY, AWAY
   availableSlots: string[];
+  averageRating?: number;
+  totalRatings?: number;
 }
 
 interface Department {
@@ -190,10 +192,19 @@ export default function HomeScreen() {
       const aheadCount = myIndex >= 0 ? myIndex : waitingEntries.length;
       const waitStr = aheadCount === 0 ? 'Next up!' : `${aheadCount * 10} mins`;
 
+      let bannerMsg = `Waiting in queue (${aheadCount} patient${aheadCount !== 1 ? 's' : ''} ahead)`;
+      if (aheadCount === 0) {
+        bannerMsg = `🔔 You're next in line! Please wait outside ${roomName}`;
+      } else if (aheadCount === 1) {
+        bannerMsg = `🔔 Almost your turn (1 ahead)! Proceed towards ${roomName}`;
+      } else if (aheadCount === 2) {
+        bannerMsg = `🔔 2 tokens away! Please head towards ${roomName}`;
+      }
+
       setPeopleAhead(aheadCount);
       setEstWaitTime(waitStr);
       setQueueBannerStyle('waiting');
-      setQueueBannerText(`Waiting in queue (${aheadCount} patient${aheadCount !== 1 ? 's' : ''} ahead)`);
+      setQueueBannerText(bannerMsg);
     }
   }, [activeAppointment, doctors]);
 
@@ -610,9 +621,15 @@ export default function HomeScreen() {
                     <Text style={styles.docDetailText}>Room {doc.roomNumber}</Text>
                   </View>
                   <View style={styles.docDetailCell}>
+                    <Ionicons name="star" size={13} color="#FBBF24" style={{ marginRight: 3 }} />
+                    <Text style={{ color: '#FBBF24', fontSize: 12, fontWeight: '700' }}>
+                      {(doc.averageRating || 5.0).toFixed(1)} {doc.totalRatings ? `(${doc.totalRatings})` : ''}
+                    </Text>
+                  </View>
+                  <View style={styles.docDetailCell}>
                     <Ionicons name="calendar-outline" size={14} color="#94A3B8" style={{ marginRight: 4 }} />
                     <Text style={styles.docDetailText}>
-                      {doc.availableSlots ? `${doc.availableSlots.length} daily slots` : 'No slots'}
+                      {doc.availableSlots ? `${doc.availableSlots.length} slots` : 'No slots'}
                     </Text>
                   </View>
                 </View>

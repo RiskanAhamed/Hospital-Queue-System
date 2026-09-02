@@ -914,17 +914,24 @@ function renderDoctorRooms() {
         return;
     }
 
-    container.innerHTML = doctorsData.map(doc => `
-        <div style="background:rgba(255,255,255,0.03); border:1px solid var(--border-color); padding:16px; border-radius:12px; margin-bottom:12px;">
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-                <div>
-                    <h4 style="font-weight:700; font-size:0.95rem;">${escapeHtml(doc.name)}</h4>
-                    <p style="font-size:0.8rem; color:var(--text-muted);">${escapeHtml(doc.departmentName || 'General')} &bull; ${escapeHtml(doc.roomNumber || 'Room --')}</p>
+    container.innerHTML = doctorsData.map(doc => {
+        const rating = doc.averageRating || 5.0;
+        const reviews = doc.totalRatings || 0;
+        return `
+            <div style="background:rgba(255,255,255,0.03); border:1px solid var(--border-color); padding:16px; border-radius:12px; margin-bottom:12px;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <div>
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <h4 style="font-weight:700; font-size:0.95rem;">${escapeHtml(doc.name)}</h4>
+                            <span style="background:rgba(251,191,36,0.15); color:#FBBF24; padding:1px 6px; border-radius:8px; font-size:0.72rem; font-weight:700;">⭐ ${rating.toFixed(1)}</span>
+                        </div>
+                        <p style="font-size:0.8rem; color:var(--text-muted); margin-top:2px;">${escapeHtml(doc.departmentName || 'General')} &bull; ${escapeHtml(doc.roomNumber || 'Room --')}</p>
+                    </div>
+                    <span class="status-badge status-${doc.available ? 'called' : 'idle'}">${doc.available ? 'ACTIVE' : 'OFFLINE'}</span>
                 </div>
-                <span class="status-badge status-${doc.available ? 'called' : 'idle'}">${doc.available ? 'ACTIVE' : 'OFFLINE'}</span>
             </div>
-        </div>
-    `).join('');
+        `;
+    }).join('');
 }
 
 function renderDoctorsGrid() {
@@ -936,24 +943,33 @@ function renderDoctorsGrid() {
         return;
     }
 
-    container.innerHTML = doctorsData.map(doc => `
-        <div class="card glass doctor-card" style="padding: 20px;">
-            <div style="display: flex; gap: 16px; align-items: center; margin-bottom: 16px;">
-                <div class="avatar" style="width: 48px; height: 48px; font-size: 1.1rem; background: rgba(56, 189, 248, 0.15); color: var(--primary);">${getInitials(doc.name)}</div>
-                <div>
-                    <h3 style="font-size: 1.1rem; font-weight: 700;">${escapeHtml(doc.name)}</h3>
-                    <p style="font-size: 0.85rem; color: var(--text-muted);">${escapeHtml(doc.specialization || doc.departmentName || 'Specialist')} &bull; ${escapeHtml(doc.roomNumber || 'Room --')}</p>
+    container.innerHTML = doctorsData.map(doc => {
+        const rating = doc.averageRating || 5.0;
+        const reviews = doc.totalRatings || 0;
+        return `
+            <div class="card glass doctor-card" style="padding: 20px;">
+                <div style="display: flex; gap: 16px; align-items: center; margin-bottom: 16px;">
+                    <div class="avatar" style="width: 48px; height: 48px; font-size: 1.1rem; background: rgba(56, 189, 248, 0.15); color: var(--primary);">${getInitials(doc.name)}</div>
+                    <div style="flex:1;">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <h3 style="font-size: 1.1rem; font-weight: 700;">${escapeHtml(doc.name)}</h3>
+                            <span style="background:rgba(251,191,36,0.12); color:#FBBF24; border:1px solid rgba(251,191,36,0.3); padding:2px 8px; border-radius:12px; font-size:0.75rem; font-weight:700;">
+                                ⭐ ${rating.toFixed(1)} ${reviews > 0 ? `(${reviews} reviews)` : '(New)'}
+                            </span>
+                        </div>
+                        <p style="font-size: 0.85rem; color: var(--text-muted); margin-top:2px;">${escapeHtml(doc.specialization || doc.departmentName || 'Specialist')} &bull; ${escapeHtml(doc.roomNumber || 'Room --')}</p>
+                    </div>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 12px; border-top: 1px solid var(--border-color); flex-wrap: wrap; gap: 8px;">
+                    <span class="status-badge status-${doc.available ? 'called' : 'idle'}">${doc.available ? '● Available' : '○ On Leave'}</span>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <span style="font-size: 0.8rem; color: var(--text-muted);">Max: ${doc.maxDailyAppointments || 30}/day</span>
+                        <button class="btn btn-sm ${doc.available ? 'btn-warning' : 'btn-primary'}" onclick="toggleDoctorAvailability('${doc.id}', ${!!doc.available})">${doc.available ? 'Mark Unavailable' : 'Mark Available'}</button>
+                    </div>
                 </div>
             </div>
-            <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 12px; border-top: 1px solid var(--border-color); flex-wrap: wrap; gap: 8px;">
-                <span class="status-badge status-${doc.available ? 'called' : 'idle'}">${doc.available ? '● Available' : '○ On Leave'}</span>
-                <div style="display:flex; align-items:center; gap:8px;">
-                    <span style="font-size: 0.8rem; color: var(--text-muted);">Max: ${doc.maxDailyAppointments || 30}/day</span>
-                    <button class="btn btn-sm ${doc.available ? 'btn-warning' : 'btn-primary'}" onclick="toggleDoctorAvailability('${doc.id}', ${!!doc.available})">${doc.available ? 'Mark Unavailable' : 'Mark Available'}</button>
-                </div>
-            </div>
-        </div>
-    `).join('');
+        `;
+    }).join('');
 }
 
 // BUG 37 FIX: Module-level state for the appointment detail modal

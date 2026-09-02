@@ -25,4 +25,6 @@ public class Doctor {
     private int maxDailyAppointments = 30;
     private boolean available = true;
     private List<String> availableSlots; // e.g. ["09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "14:00", "14:30"]
+    private Double averageRating = 5.0;
+    private Integer totalRatings = 0;
 }

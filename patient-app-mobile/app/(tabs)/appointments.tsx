@@ -9,6 +9,8 @@ import {
   ActivityIndicator,
   Alert,
   Platform,
+  Modal,
+  TextInput,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
@@ -26,6 +28,9 @@ interface Appointment {
   timeSlot: string;
   queueNumber: string;
   status: 'BOOKED' | 'CHECKED_IN' | 'WAITING' | 'CALLED' | 'IN_CONSULTATION' | 'COMPLETED' | 'CANCELLED';
+  rating?: number;
+  feedbackComment?: string;
+  ratedAt?: string;
 }
 
 const STATUS_COLORS: Record<string, { bg: string; color: string }> = {
@@ -46,6 +51,13 @@ export default function AppointmentsScreen() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Rating Modal state
+  const [ratingModalVisible, setRatingModalVisible] = useState(false);
+  const [selectedApptForRating, setSelectedApptForRating] = useState<Appointment | null>(null);
+  const [ratingScore, setRatingScore] = useState(5);
+  const [feedbackText, setFeedbackText] = useState('');
+  const [submittingRating, setSubmittingRating] = useState(false);
 
   const fetchAppointments = useCallback(async () => {
     if (!hospitalId || !user?.userId) return;
@@ -125,6 +137,42 @@ export default function AppointmentsScreen() {
     );
   };
 
+  const openRatingModal = (appt: Appointment) => {
+    setSelectedApptForRating(appt);
+    setRatingScore(appt.rating || 5);
+    setFeedbackText(appt.feedbackComment || '');
+    setRatingModalVisible(true);
+  };
+
+  const submitRating = async () => {
+    if (!hospitalId || !selectedApptForRating) return;
+
+    setSubmittingRating(true);
+    try {
+      const res = await authFetch(`/hospitals/${hospitalId}/appointments/${selectedApptForRating.id}/rating`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          rating: ratingScore,
+          feedbackComment: feedbackText.trim() || undefined,
+        }),
+      });
+
+      if (res.ok) {
+        Alert.alert('Thank you!', 'Your feedback and star rating have been submitted successfully.');
+        setRatingModalVisible(false);
+        fetchAppointments();
+      } else {
+        const errText = await res.text();
+        Alert.alert('Error', errText || 'Failed to submit rating.');
+      }
+    } catch (e) {
+      Alert.alert('Error', 'Network connection error.');
+    } finally {
+      setSubmittingRating(false);
+    }
+  };
+
   if (loading && !refreshing) {
     return (
       <View style={styles.loadingContainer}>
@@ -190,6 +238,51 @@ export default function AppointmentsScreen() {
                   </View>
                 </View>
 
+                {/* Rating section for completed appointments */}
+                {item.status === 'COMPLETED' && (
+                  <View style={{ marginTop: 12, paddingTop: 12, borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)' }}>
+                    {item.rating ? (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                          <Ionicons name="star" size={16} color="#FBBF24" style={{ marginRight: 4 }} />
+                          <Text style={{ color: '#FBBF24', fontSize: 13, fontWeight: '700' }}>
+                            You Rated: {item.rating}/5
+                          </Text>
+                          {item.feedbackComment && (
+                            <Text style={{ color: '#94A3B8', fontSize: 12, marginLeft: 8, fontStyle: 'italic' }}>
+                              "{item.feedbackComment}"
+                            </Text>
+                          )}
+                        </View>
+                        <TouchableOpacity onPress={() => openRatingModal(item)}>
+                          <Text style={{ color: '#38BDF8', fontSize: 12, fontWeight: '600' }}>Edit</Text>
+                        </TouchableOpacity>
+                      </View>
+                    ) : (
+                      <TouchableOpacity
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          backgroundColor: 'rgba(251,191,36,0.12)',
+                          borderColor: 'rgba(251,191,36,0.3)',
+                          borderWidth: 1,
+                          paddingVertical: 8,
+                          paddingHorizontal: 12,
+                          borderRadius: 8,
+                          gap: 6,
+                        }}
+                        onPress={() => openRatingModal(item)}
+                      >
+                        <Ionicons name="star" size={15} color="#FBBF24" />
+                        <Text style={{ color: '#FBBF24', fontSize: 13, fontWeight: '700' }}>
+                          Rate Doctor & Consultation
+                        </Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                )}
+
                 {/* Actions row */}
                 {canAction && (
                   <View style={styles.actionsRow}>
@@ -225,6 +318,86 @@ export default function AppointmentsScreen() {
           })
         )}
       </ScrollView>
+
+      {/* 5-Star Doctor Rating Modal */}
+      <Modal
+        visible={ratingModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setRatingModalVisible(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
+          <View style={{ width: '100%', maxWidth: 360, backgroundColor: '#0F172A', borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1, borderRadius: 16, padding: 20 }}>
+            <Text style={{ fontSize: 18, fontWeight: '800', color: '#F8FAFC', marginBottom: 4, textAlign: 'center' }}>
+              Rate Doctor
+            </Text>
+            <Text style={{ fontSize: 13, color: '#94A3B8', marginBottom: 16, textAlign: 'center' }}>
+              {selectedApptForRating?.doctorName} • {selectedApptForRating?.departmentName}
+            </Text>
+
+            {/* Stars selector */}
+            <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 10, marginBottom: 20 }}>
+              {[1, 2, 3, 4, 5].map((star) => (
+                <TouchableOpacity key={star} onPress={() => setRatingScore(star)}>
+                  <Ionicons
+                    name={star <= ratingScore ? 'star' : 'star-outline'}
+                    size={34}
+                    color={star <= ratingScore ? '#FBBF24' : '#64748B'}
+                  />
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            {/* Feedback text input */}
+            <Text style={{ fontSize: 12, fontWeight: '600', color: '#94A3B8', marginBottom: 6 }}>
+              Comments & Review (Optional)
+            </Text>
+            <TextInput
+              style={{
+                backgroundColor: 'rgba(255,255,255,0.04)',
+                borderColor: 'rgba(255,255,255,0.1)',
+                borderWidth: 1,
+                borderRadius: 8,
+                padding: 10,
+                color: '#F8FAFC',
+                fontSize: 13,
+                height: 70,
+                textAlignVertical: 'top',
+                marginBottom: 20,
+              }}
+              placeholder="Share details of your consultation experience..."
+              placeholderTextColor="#64748B"
+              multiline
+              numberOfLines={3}
+              value={feedbackText}
+              onChangeText={setFeedbackText}
+            />
+
+            {/* Buttons */}
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <TouchableOpacity
+                style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.06)', paddingVertical: 12, borderRadius: 8, alignItems: 'center' }}
+                onPress={() => setRatingModalVisible(false)}
+                disabled={submittingRating}
+              >
+                <Text style={{ color: '#94A3B8', fontWeight: '600' }}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={{ flex: 1, backgroundColor: '#38BDF8', paddingVertical: 12, borderRadius: 8, alignItems: 'center' }}
+                onPress={submitRating}
+                disabled={submittingRating}
+              >
+                {submittingRating ? (
+                  <ActivityIndicator size="small" color="#090D16" />
+                ) : (
+                  <Text style={{ color: '#090D16', fontWeight: '700' }}>Submit Rating</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }

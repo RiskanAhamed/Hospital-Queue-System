@@ -334,4 +334,76 @@ public class AppointmentController {
 
         return ResponseEntity.ok(saved);
     }
+
+    @PostMapping("/{appointmentId}/rating")
+    public ResponseEntity<?> submitAppointmentRating(
+            @PathVariable String hospitalId,
+            @PathVariable String appointmentId,
+            @RequestBody java.util.Map<String, Object> payload) {
+        tenantSecurityService.validateTenantAccess(hospitalId);
+        UserPrincipal currentUser = tenantSecurityService.getCurrentUser();
+
+        java.util.Optional<Appointment> apptOpt = appointmentRepository.findById(appointmentId);
+        if (apptOpt.isEmpty() || !apptOpt.get().getHospitalId().equals(hospitalId)) {
+            return ResponseEntity.notFound().build();
+        }
+
+        Appointment appt = apptOpt.get();
+
+        // Ensure only the patient who had the appointment or an admin can submit the rating
+        if ("PATIENT".equalsIgnoreCase(currentUser.getRole()) && !appt.getPatientId().equals(currentUser.getUserId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Access denied: You can only rate your own appointments.");
+        }
+
+        // Must be a completed appointment to rate
+        if (!"COMPLETED".equalsIgnoreCase(appt.getStatus())) {
+            return ResponseEntity.badRequest().body("Only completed consultations can be rated.");
+        }
+
+        Object ratingObj = payload.get("rating");
+        if (ratingObj == null) {
+            return ResponseEntity.badRequest().body("Rating is required (1 to 5 stars).");
+        }
+
+        int ratingVal;
+        try {
+            ratingVal = Integer.parseInt(ratingObj.toString());
+        } catch (NumberFormatException e) {
+            return ResponseEntity.badRequest().body("Invalid rating format. Must be an integer between 1 and 5.");
+        }
+
+        if (ratingVal < 1 || ratingVal > 5) {
+            return ResponseEntity.badRequest().body("Rating must be between 1 and 5 stars.");
+        }
+
+        String feedback = payload.get("feedbackComment") != null ? payload.get("feedbackComment").toString().trim() : null;
+
+        appt.setRating(ratingVal);
+        appt.setFeedbackComment(feedback);
+        appt.setRatedAt(java.time.LocalDateTime.now());
+        Appointment saved = appointmentRepository.save(appt);
+
+        // Recalculate Doctor's overall rating
+        if (saved.getDoctorId() != null) {
+            java.util.Optional<Doctor> docOpt = doctorRepository.findById(saved.getDoctorId());
+            if (docOpt.isPresent()) {
+                Doctor doc = docOpt.get();
+                List<Appointment> allDocAppts = appointmentRepository.findByHospitalIdAndDoctorId(hospitalId, doc.getId());
+                List<Integer> ratings = allDocAppts.stream()
+                        .map(Appointment::getRating)
+                        .filter(java.util.Objects::nonNull)
+                        .collect(java.util.stream.Collectors.toList());
+
+                if (!ratings.isEmpty()) {
+                    double avg = ratings.stream().mapToInt(Integer::intValue).average().orElse(5.0);
+                    doc.setAverageRating(Math.round(avg * 10.0) / 10.0);
+                    doc.setTotalRatings(ratings.size());
+                    doctorRepository.save(doc);
+                }
+            }
+        }
+
+        auditLogService.log(hospitalId, currentUser.getUserId(), "DOCTOR_RATED", "Submitted " + ratingVal + "-star rating for Doctor " + saved.getDoctorName() + " on appointment " + saved.getId());
+        return ResponseEntity.ok(saved);
+    }
 }

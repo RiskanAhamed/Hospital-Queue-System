@@ -14,6 +14,8 @@ public interface QueueRepository extends MongoRepository<QueueEntry, String> {
     Optional<QueueEntry> findByAppointmentId(String appointmentId);
     Optional<QueueEntry> findFirstByHospitalIdAndDoctorIdAndStatusOrderBySequenceNumberAsc(String hospitalId, String doctorId, String status);
     Optional<QueueEntry> findFirstByHospitalIdAndDoctorIdAndQueueDateAndStatusOrderBySequenceNumberAsc(String hospitalId, String doctorId, String queueDate, String status);
+    List<QueueEntry> findByHospitalIdAndDoctorIdAndStatusOrderBySequenceNumberAsc(String hospitalId, String doctorId, String status);
+    List<QueueEntry> findByHospitalIdAndDoctorIdAndQueueDateAndStatusOrderBySequenceNumberAsc(String hospitalId, String doctorId, String queueDate, String status);
     long countByHospitalIdAndDoctorId(String hospitalId, String doctorId);
     long countByHospitalIdAndDoctorIdAndQueueDate(String hospitalId, String doctorId, String queueDate);
 }

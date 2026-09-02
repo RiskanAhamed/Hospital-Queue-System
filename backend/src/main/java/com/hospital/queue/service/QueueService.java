@@ -124,28 +124,46 @@ public class QueueService {
             QueueEntry updated = queueRepository.save(queue);
 
             // Notify the called patient "It's your turn"
+            String roomNum = docOpt.map(Doctor::getRoomNumber).orElse("TBD");
+            String doctorName = docOpt.map(Doctor::getName).orElse("your doctor");
+
             notificationService.createAndSendNotification(
                     hospitalId,
                     updated.getPatientId(),
                     "QUEUE_TURN",
                     "It's your turn",
-                    "Please proceed to Room " + docOpt.map(Doctor::getRoomNumber).orElse("TBD") + " for Doctor " + docOpt.map(Doctor::getName).orElse("your doctor")
+                    "Please proceed to Room " + roomNum + " for Doctor " + doctorName + "."
             );
 
-            // Notify the next-in-line patient "You're next, please be ready"
-            Optional<QueueEntry> nextInLine = queueRepository.findFirstByHospitalIdAndDoctorIdAndQueueDateAndStatusOrderBySequenceNumberAsc(hospitalId, doctorId, today, "WAITING");
-            if (nextInLine.isEmpty()) {
-                nextInLine = queueRepository.findFirstByHospitalIdAndDoctorIdAndStatusOrderBySequenceNumberAsc(hospitalId, doctorId, "WAITING");
+            // Fetch upcoming waiting patients for proximity alerts
+            List<QueueEntry> waitingList = queueRepository.findByHospitalIdAndDoctorIdAndQueueDateAndStatusOrderBySequenceNumberAsc(hospitalId, doctorId, today, "WAITING");
+            if (waitingList.isEmpty()) {
+                waitingList = queueRepository.findByHospitalIdAndDoctorIdAndStatusOrderBySequenceNumberAsc(hospitalId, doctorId, "WAITING");
             }
-            nextInLine.ifPresent(nil -> {
+
+            // 1. Alert the patient directly next in line (1 away)
+            if (waitingList.size() > 0) {
+                QueueEntry next1 = waitingList.get(0);
                 notificationService.createAndSendNotification(
                         hospitalId,
-                        nil.getPatientId(),
+                        next1.getPatientId(),
                         "QUEUE_NEXT",
                         "You're next, please be ready",
-                        "You are next in line for Doctor " + docOpt.map(Doctor::getName).orElse("your doctor") + ". Please be ready."
+                        "You are next in line for Doctor " + doctorName + ". Please be ready near Room " + roomNum + "."
                 );
-            });
+            }
+
+            // 2. Alert the patient 2 tokens away (Proximity Alert)
+            if (waitingList.size() > 1) {
+                QueueEntry next2 = waitingList.get(1);
+                notificationService.createAndSendNotification(
+                        hospitalId,
+                        next2.getPatientId(),
+                        "QUEUE_PROXIMITY_ALERT",
+                        "Your turn is approaching (2 tokens away)",
+                        "Only 2 patients ahead for Doctor " + doctorName + " in Room " + roomNum + ". Please head towards the waiting area."
+                );
+            }
 
             broadcastQueueState(hospitalId, doctorId);
             return updated;
