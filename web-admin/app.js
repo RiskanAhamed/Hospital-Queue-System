@@ -66,7 +66,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (roleEl)   roleEl.textContent   = getRoleLabel(auth.role);
         if (chipEl)   chipEl.textContent   = auth.role  || 'STAFF';
 
-        // Show/hide audit log tab based on role
+        // Show/hide audit log and multi-tenant tabs based on role
         const auditTab = document.getElementById('navAuditTab');
         if (auditTab) {
             if (auth.role === 'HOSPITAL_ADMIN' || auth.role === 'SUPER_ADMIN') {
@@ -74,6 +74,21 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 auditTab.style.display = 'none';
             }
+        }
+
+        const hospitalsTab = document.getElementById('navHospitalsTab');
+        const superAdminBox = document.getElementById('superAdminTenantBox');
+        const hospLockBox = document.getElementById('hospitalLockBox');
+
+        if (auth.role === 'SUPER_ADMIN') {
+            if (hospitalsTab) hospitalsTab.style.display = 'block';
+            if (superAdminBox) superAdminBox.style.display = 'block';
+            if (hospLockBox) hospLockBox.style.display = 'none';
+            fetchSuperAdminHospitalsList();
+        } else {
+            if (hospitalsTab) hospitalsTab.style.display = 'none';
+            if (superAdminBox) superAdminBox.style.display = 'none';
+            if (hospLockBox) hospLockBox.style.display = 'flex';
         }
     }
 
@@ -387,7 +402,136 @@ function switchTab(tabId) {
         fetchReports();
     } else if (tabId === 'audit') {
         fetchAuditLogs();
+    } else if (tabId === 'hospitals') {
+        fetchSuperAdminHospitalsList();
     }
+}
+
+// ── Super Admin Multi-Tenant Management ──
+let allHospitalsData = [];
+
+function fetchSuperAdminHospitalsList() {
+    authFetch(`${API_BASE}/hospitals/public/list`)
+        .then(r => r.ok ? r.json() : [])
+        .then(hospitals => {
+            allHospitalsData = hospitals || [];
+            
+            // Populate sidebar Super Admin switcher
+            const selectEl = document.getElementById('superAdminHospitalSelect');
+            if (selectEl) {
+                selectEl.innerHTML = allHospitalsData.map(h => `
+                    <option value="${h.id || h.code}" ${h.id === currentHospitalId || h.code === currentHospitalId ? 'selected' : ''}>
+                        🏥 ${escapeHtml(h.name)} (${escapeHtml(h.code)})
+                    </option>
+                `).join('');
+            }
+
+            // Populate Super Admin directory table
+            const tbody = document.getElementById('superAdminHospitalsTableBody');
+            if (tbody) {
+                if (allHospitalsData.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="7" style="text-align:center; color:var(--text-muted); padding:20px;">No hospital tenants registered yet.</td></tr>`;
+                    return;
+                }
+                tbody.innerHTML = allHospitalsData.map(h => {
+                    const isCurrent = h.id === currentHospitalId || h.code === currentHospitalId;
+                    const plan = (h.subscriptionPlan || 'BASIC').toUpperCase();
+                    const planBadgeClass = plan === 'PRO' ? 'pro' : plan === 'ENTERPRISE' ? 'enterprise' : 'basic';
+                    return `
+                        <tr>
+                            <td><strong style="color:var(--primary); font-family:monospace;">${escapeHtml(h.code)}</strong></td>
+                            <td><strong>${escapeHtml(h.name)}</strong></td>
+                            <td><span class="sub-plan-badge-lg ${planBadgeClass}" style="font-size:0.7rem; padding:3px 8px;">${plan}</span></td>
+                            <td>${escapeHtml(h.phone || '—')}</td>
+                            <td>${escapeHtml(h.email || '—')}</td>
+                            <td><span class="status-badge status-available">Active</span></td>
+                            <td>
+                                ${isCurrent ? 
+                                    `<span style="color:#34D399; font-size:0.8rem; font-weight:700;">✓ Active Context</span>` :
+                                    `<button class="btn btn-sm btn-secondary" onclick="onSuperAdminHospitalChange('${h.id || h.code}')" style="font-size:0.75rem; padding:4px 8px;">Switch Context</button>`
+                                }
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+
+            if (window.lucide) lucide.createIcons();
+        })
+        .catch(err => {
+            console.error('Error fetching all hospitals list:', err);
+        });
+}
+
+function onSuperAdminHospitalChange(selectedHospitalId) {
+    if (!selectedHospitalId || selectedHospitalId === currentHospitalId) return;
+
+    currentHospitalId = selectedHospitalId;
+    currentDoctorId = '';
+
+    // Re-fetch all data under the selected hospital context
+    fetchHospitalDetails();
+    fetchDoctorsList();
+    fetchDepartmentsList();
+    fetchMasterAppointments();
+    fetchDashboardStats();
+    if (stompClient && stompClient.connected) {
+        connectWebSocket();
+    }
+    fetchSuperAdminHospitalsList();
+}
+
+function openAddHospitalModal() {
+    const modal = document.getElementById('modalAddHospital');
+    if (modal) modal.classList.add('active');
+}
+
+function closeAddHospitalModal() {
+    const modal = document.getElementById('modalAddHospital');
+    if (modal) modal.classList.remove('active');
+}
+
+function submitAddHospital(event) {
+    if (event) event.preventDefault();
+    const name = document.getElementById('newHospName').value.trim();
+    const code = document.getElementById('newHospCode').value.trim().toUpperCase();
+    const subscriptionPlan = document.getElementById('newHospPlan').value;
+    const address = document.getElementById('newHospAddress').value.trim();
+    const phone = document.getElementById('newHospPhone').value.trim();
+    const email = document.getElementById('newHospEmail').value.trim();
+
+    if (!name || !code) {
+        alert('Hospital Name and Code are required.');
+        return;
+    }
+
+    authFetch(`${API_BASE}/hospitals`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, code, subscriptionPlan, address, phone, email })
+    })
+    .then(async r => {
+        if (!r.ok) {
+            const errText = await r.text();
+            throw new Error(errText || 'Failed to create hospital tenant');
+        }
+        return r.json();
+    })
+    .then(newHospital => {
+        closeAddHospitalModal();
+        alert(`🎉 Successfully registered new hospital tenant: ${newHospital.name} (${newHospital.code})!`);
+        document.getElementById('newHospName').value = '';
+        document.getElementById('newHospCode').value = '';
+        document.getElementById('newHospAddress').value = '';
+        document.getElementById('newHospPhone').value = '';
+        document.getElementById('newHospEmail').value = '';
+        
+        onSuperAdminHospitalChange(newHospital.id || newHospital.code);
+    })
+    .catch(err => {
+        console.error('Error creating hospital tenant:', err);
+        alert(err.message || 'Error creating hospital tenant.');
+    });
 }
 
 // Fetch dashboard stats from API

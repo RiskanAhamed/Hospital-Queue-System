@@ -127,6 +127,10 @@
                     <i data-lucide="file-text"></i>
                     <span>System Audit Logs</span>
                 </button>
+                <button class="nav-item" id="navHospitalsTab" onclick="switchTab('hospitals')" style="display:none;">
+                    <i data-lucide="network"></i>
+                    <span>Multi-Tenant Hospitals</span>
+                </button>
             </nav>
 
             <!-- Subscription badge with direct Upgrade button -->
@@ -141,8 +145,19 @@
                 </button>
             </div>
 
+            <!-- Super Admin Multi-Tenant Switcher -->
+            <div id="superAdminTenantBox" style="display:none; background:rgba(251,191,36,0.06); border:1px solid rgba(251,191,36,0.3); border-radius:var(--radius-md); padding:12px 14px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                    <div style="font-size:0.7rem; color:#FBBF24; text-transform:uppercase; font-weight:700; letter-spacing:0.5px;">👑 Tenant Switcher</div>
+                    <button class="btn btn-sm" onclick="openAddHospitalModal()" style="font-size:0.68rem; padding:2px 6px; background:rgba(251,191,36,0.2); color:#FBBF24; border:1px solid rgba(251,191,36,0.4); border-radius:4px; cursor:pointer;">+ New</button>
+                </div>
+                <select id="superAdminHospitalSelect" onchange="onSuperAdminHospitalChange(this.value)" style="width:100%; background:#0F172A; border:1px solid rgba(251,191,36,0.3); color:#FBBF24; font-size:0.82rem; font-weight:600; padding:6px 8px; border-radius:6px; outline:none; cursor:pointer;">
+                    <!-- Populated dynamically -->
+                </select>
+            </div>
+
             <!-- Locked per-tenant hospital info -->
-            <div class="hospital-lock-box">
+            <div class="hospital-lock-box" id="hospitalLockBox">
                 <span class="lock-icon">🔒</span>
                 <div class="hospital-lock-info">
                     <div class="lock-label">Your Hospital</div>
@@ -638,6 +653,46 @@
                         </div>
                     </div>
                 </section>
+
+                <!-- TAB 9: MULTI-TENANT HOSPITALS (SUPER ADMIN ONLY) -->
+                <section id="tab-hospitals" class="tab-page">
+                    <div class="page-title-row">
+                        <div>
+                            <h1>👑 Global Multi-Tenant Hospital Directory</h1>
+                            <p>Manage all registered hospital tenants across the MediFlow SaaS network.</p>
+                        </div>
+                        <button class="btn btn-primary" onclick="openAddHospitalModal()">
+                            <i data-lucide="plus"></i> Register Hospital Tenant
+                        </button>
+                    </div>
+                    
+                    <div class="card glass">
+                        <div class="card-header" style="display:flex; justify-content:space-between; align-items:center;">
+                            <h3>All Registered Hospital Tenants</h3>
+                            <button class="btn btn-sm btn-secondary" onclick="fetchSuperAdminHospitalsList()">
+                                <i data-lucide="refresh-cw"></i> Refresh
+                            </button>
+                        </div>
+                        <div class="table-responsive" style="max-height: 500px;">
+                            <table class="custom-table">
+                                <thead>
+                                    <tr>
+                                        <th>Tenant Code</th>
+                                        <th>Hospital Name</th>
+                                        <th>Subscription Plan</th>
+                                        <th>Phone</th>
+                                        <th>Email</th>
+                                        <th>Status</th>
+                                        <th>Switch Context</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="superAdminHospitalsTableBody">
+                                    <!-- Injected dynamically -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
             </div>
         </main>
     </div>
@@ -883,6 +938,55 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" onclick="closeRescheduleModal()">Cancel</button>
                     <button type="submit" class="btn btn-primary">Confirm Reschedule</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal 8: Register New Hospital Tenant (Super Admin Only) -->
+    <div id="modalAddHospital" class="modal-overlay">
+        <div class="modal-card" style="max-width: 520px;">
+            <div class="modal-header">
+                <h3>👑 Register New Hospital Tenant</h3>
+                <button class="close-btn" onclick="closeAddHospitalModal()">&times;</button>
+            </div>
+            <form onsubmit="submitAddHospital(event)">
+                <div class="modal-body">
+                    <p style="font-size:0.85rem; color:var(--text-muted); margin-bottom:16px;">
+                        Onboard a new independent hospital tenant to the MediFlow SaaS platform.
+                    </p>
+                    <div class="form-group">
+                        <label>Hospital Name *</label>
+                        <input type="text" id="newHospName" placeholder="e.g. Apex Health Medical Center" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Tenant Code (Unique Identifier) *</label>
+                        <input type="text" id="newHospCode" placeholder="e.g. HOSP003 or APEX01" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Subscription Tier Plan *</label>
+                        <select id="newHospPlan" required>
+                            <option value="BASIC">✦ Basic Plan (Free Tier)</option>
+                            <option value="PRO" selected>★ Pro Plan ($99/mo)</option>
+                            <option value="ENTERPRISE">◆ Enterprise Plan ($299/mo)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Address</label>
+                        <input type="text" id="newHospAddress" placeholder="e.g. 742 Evergreen Terrace, Springfield">
+                    </div>
+                    <div class="form-group">
+                        <label>Phone</label>
+                        <input type="text" id="newHospPhone" placeholder="e.g. +1 (555) 012-3456">
+                    </div>
+                    <div class="form-group">
+                        <label>Contact Email</label>
+                        <input type="email" id="newHospEmail" placeholder="e.g. contact@apexhealth.org">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeAddHospitalModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create Hospital Tenant</button>
                 </div>
             </form>
         </div>

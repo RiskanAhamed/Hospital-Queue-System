@@ -108,10 +108,13 @@ public class HospitalController {
         if (requestData.getQueueAlgorithm() != null && !requestData.getQueueAlgorithm().trim().isEmpty()) {
             hospital.setQueueAlgorithm(requestData.getQueueAlgorithm().trim());
         }
-        // subscriptionPlan defaults to "BASIC" via the model; active defaults to true; createdAt auto-sets.
+        if (requestData.getSubscriptionPlan() != null && !requestData.getSubscriptionPlan().trim().isEmpty()) {
+            hospital.setSubscriptionPlan(requestData.getSubscriptionPlan().trim().toUpperCase());
+        }
 
         try {
             Hospital saved = hospitalRepository.save(hospital);
+            auditLogService.log(saved.getId(), tenantSecurityService.getCurrentUser().getUserId(), "HOSPITAL_CREATED", "Registered new hospital tenant: " + saved.getName() + " (" + saved.getCode() + ")");
             return ResponseEntity.ok(saved);
         } catch (org.springframework.dao.DuplicateKeyException e) {
             return ResponseEntity.badRequest().body("Hospital code is already in use.");
