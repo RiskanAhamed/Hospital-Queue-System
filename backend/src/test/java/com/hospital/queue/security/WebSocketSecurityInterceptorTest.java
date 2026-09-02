@@ -122,4 +122,27 @@ public class WebSocketSecurityInterceptorTest {
 
         assertDoesNotThrow(() -> interceptor.preSend(message, messageChannel));
     }
+
+    @Test
+    public void testUserCanSubscribeToOwnHospitalDoctorsTopic() {
+        UserPrincipal principal = new UserPrincipal("user1", "user@example.com", "PATIENT", "hosp123");
+        Message<?> message = createSubscribeMessage(principal, "/topic/hospital/hosp123/doctors");
+
+        assertDoesNotThrow(() -> interceptor.preSend(message, messageChannel));
+    }
+
+    @Test
+    public void testUserCannotSubscribeToDifferentHospitalDoctorsTopic() {
+        UserPrincipal principal = new UserPrincipal("user1", "user@example.com", "PATIENT", "hosp123");
+        Message<?> message = createSubscribeMessage(principal, "/topic/hospital/hosp999/doctors");
+
+        when(hospitalRepository.findById("hosp123")).thenReturn(Optional.of(testHospital));
+        when(hospitalRepository.findById("hosp999")).thenReturn(Optional.empty());
+
+        IllegalArgumentException ex = assertThrows(IllegalArgumentException.class, () ->
+                interceptor.preSend(message, messageChannel)
+        );
+        assertTrue(ex.getMessage().contains("Forbidden STOMP subscription"));
+        assertTrue(ex.getMessage().contains("another hospital"));
+    }
 }

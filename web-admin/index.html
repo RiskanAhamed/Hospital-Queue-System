@@ -438,7 +438,16 @@
                                 </div>
                                 <div class="form-group">
                                     <label>Queue Algorithm</label>
-                                    <select><option>FIFO (First-In First-Out) + Priority Call</option></select>
+                                    <select id="queueAlgorithmSelect">
+                                        <option value="FIFO">FIFO (First-In First-Out) + Priority Call</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>SaaS Subscription Level</label>
+                                    <div class="readonly-info-line" id="settingsSubscriptionInfo">
+                                        <i data-lucide="shield-check" style="width: 16px; height: 16px; color: var(--primary); flex-shrink: 0;"></i>
+                                        <span>Current Plan: <strong id="settingsPlanText">PRO</strong> <span style="color: var(--text-muted);">— contact support to upgrade</span></span>
+                                    </div>
                                 </div>
                                 <div class="form-group">
                                     <label>WebSocket Endpoint</label>

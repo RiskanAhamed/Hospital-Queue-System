@@ -76,6 +76,9 @@ public class HospitalController {
         if (updateData.getEmail() != null && !updateData.getEmail().trim().isEmpty()) {
             hospital.setEmail(updateData.getEmail().trim());
         }
+        if (updateData.getQueueAlgorithm() != null && !updateData.getQueueAlgorithm().trim().isEmpty()) {
+            hospital.setQueueAlgorithm(updateData.getQueueAlgorithm().trim());
+        }
 
         // NOTE: code and subscriptionPlan are NOT modified here.
 
@@ -102,6 +105,9 @@ public class HospitalController {
         hospital.setAddress(requestData.getAddress() != null ? requestData.getAddress().trim() : null);
         hospital.setPhone(requestData.getPhone() != null ? requestData.getPhone().trim() : null);
         hospital.setEmail(requestData.getEmail() != null ? requestData.getEmail().trim() : null);
+        if (requestData.getQueueAlgorithm() != null && !requestData.getQueueAlgorithm().trim().isEmpty()) {
+            hospital.setQueueAlgorithm(requestData.getQueueAlgorithm().trim());
+        }
         // subscriptionPlan defaults to "BASIC" via the model; active defaults to true; createdAt auto-sets.
 
         try {

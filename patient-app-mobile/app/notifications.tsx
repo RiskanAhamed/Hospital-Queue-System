@@ -23,7 +23,7 @@ interface NotificationItem {
 }
 
 export default function NotificationsScreen() {
-  const { hospitalId } = useAuth();
+  const { hospitalId, user } = useAuth();
   const router = useRouter();
 
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
@@ -34,7 +34,10 @@ export default function NotificationsScreen() {
     if (!hospitalId) return;
 
     try {
-      const res = await authFetch(`/hospitals/${hospitalId}/notifications`);
+      const url = user?.userId
+        ? `/hospitals/${hospitalId}/notifications?userId=${encodeURIComponent(user.userId)}`
+        : `/hospitals/${hospitalId}/notifications`;
+      const res = await authFetch(url);
       if (res.ok) {
         const data = await res.json();
         // Sort newest first
@@ -49,7 +52,7 @@ export default function NotificationsScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [hospitalId]);
+  }, [hospitalId, user?.userId]);
 
   useEffect(() => {
     fetchNotifications();
@@ -61,8 +64,12 @@ export default function NotificationsScreen() {
   };
 
   const handleMarkAllRead = async () => {
+    if (!hospitalId) return;
     try {
-      const res = await authFetch(`/hospitals/${hospitalId}/notifications/read-all`, {
+      const url = user?.userId
+        ? `/hospitals/${hospitalId}/notifications/read-all?userId=${encodeURIComponent(user.userId)}`
+        : `/hospitals/${hospitalId}/notifications/read-all`;
+      const res = await authFetch(url, {
         method: 'POST',
       });
       if (res.ok) {

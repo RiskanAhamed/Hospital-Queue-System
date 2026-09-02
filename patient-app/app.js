@@ -534,11 +534,41 @@ function connectWebSocket() {
                 subscribeToQueueTopic(currentDoctorId);
             }
             subscribeToPatientNotificationsTopic();
+            subscribeToDoctorsTopic();
             fetchPatientUnreadNotificationsCount();
         });
     } catch (e) {
         console.log('WebSocket SockJS initialization error', e);
     }
+}
+
+let doctorsStompSubscription = null;
+
+function subscribeToDoctorsTopic() {
+    if (!stompClient || !stompClient.connected || !currentHospitalId) return;
+
+    if (doctorsStompSubscription) {
+        doctorsStompSubscription.unsubscribe();
+        doctorsStompSubscription = null;
+    }
+
+    const topic = `/topic/hospital/${currentHospitalId}/doctors`;
+    doctorsStompSubscription = stompClient.subscribe(topic, (message) => {
+        try {
+            const updatedDoctor = JSON.parse(message.body);
+            if (!updatedDoctor || !updatedDoctor.id) return;
+            const idx = doctorsData.findIndex(d => d.id === updatedDoctor.id);
+            if (idx >= 0) {
+                doctorsData[idx] = { ...doctorsData[idx], ...updatedDoctor };
+            } else {
+                doctorsData.push(updatedDoctor);
+            }
+            renderDoctors();
+            renderDepartmentPills();
+        } catch (e) {
+            console.error('Error parsing doctor update in patient app:', e);
+        }
+    });
 }
 
 function subscribeToQueueTopic(doctorId) {

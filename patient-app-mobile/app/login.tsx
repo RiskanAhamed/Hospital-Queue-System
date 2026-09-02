@@ -134,8 +134,8 @@ export default function LoginScreen() {
       });
       if (res.ok) {
         const data = await res.json();
-        setSuccessMessage(`Reset token printed to Console! Token: ${data.token}`);
-        setResetToken(data.token);
+        setSuccessMessage(data.message || 'If an account exists, a reset token was logged in server console. Please enter the token below.');
+        setResetToken('');
         setIsForgot(false);
         setIsReset(true);
       } else {

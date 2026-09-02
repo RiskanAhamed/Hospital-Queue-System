@@ -128,6 +128,6 @@ public class WebSocketSecurityInterceptor implements ChannelInterceptor {
             }
         }
 
-        throw new IllegalArgumentException("Forbidden STOMP subscription: Cannot subscribe to another hospital's queue topic");
+        throw new IllegalArgumentException("Forbidden STOMP subscription: Cannot subscribe to another hospital's topic");
     }
 }

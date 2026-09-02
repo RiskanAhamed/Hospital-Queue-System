@@ -6,12 +6,15 @@ import com.hospital.queue.repository.DoctorRepository;
 import com.hospital.queue.security.TenantSecurityService;
 import com.hospital.queue.service.AuditLogService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Arrays;
 import java.util.List;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/v1/hospitals/{hospitalId}/doctors")
 @RequiredArgsConstructor
@@ -20,6 +23,7 @@ public class DoctorController {
     private final DoctorRepository doctorRepository;
     private final TenantSecurityService tenantSecurityService;
     private final AuditLogService auditLogService;
+    private final SimpMessagingTemplate messagingTemplate;
 
     @GetMapping
     public ResponseEntity<List<Doctor>> getDoctorsByHospital(
@@ -51,6 +55,11 @@ public class DoctorController {
         }
         Doctor saved = doctorRepository.save(doctor);
         auditLogService.log(hospitalId, tenantSecurityService.getCurrentUser().getUserId(), "DOCTOR_CREATED", "Onboarded Doctor: " + saved.getName() + " (ID: " + saved.getId() + ")");
+        try {
+            messagingTemplate.convertAndSend("/topic/hospital/" + hospitalId + "/doctors", saved);
+        } catch (Exception e) {
+            log.error("Failed to broadcast doctor creation to STOMP topic: {}", e.getMessage(), e);
+        }
         return ResponseEntity.ok(saved);
     }
 
@@ -68,6 +77,11 @@ public class DoctorController {
             doc.setAvailable(Boolean.TRUE.equals(body.get("available")));
         }
         Doctor saved = doctorRepository.save(doc);
+        try {
+            messagingTemplate.convertAndSend("/topic/hospital/" + hospitalId + "/doctors", saved);
+        } catch (Exception e) {
+            log.error("Failed to broadcast doctor availability update to STOMP topic: {}", e.getMessage(), e);
+        }
         return ResponseEntity.ok(saved);
     }
 }

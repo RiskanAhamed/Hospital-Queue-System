@@ -19,6 +19,7 @@ import {
   connectWebSocket,
   subscribeToQueue,
   subscribeToNotifications,
+  subscribeToDoctors,
   disconnectWebSocket,
   unsubscribeFromQueue,
 } from '../../utils/websocket';
@@ -131,10 +132,14 @@ export default function HomeScreen() {
       }
 
       // 5. Fetch Notification Unread Count
-      const notifRes = await authFetch(`/hospitals/${hospitalId}/notifications/unread-count`);
+      const notifUrl = user?.userId 
+        ? `/hospitals/${hospitalId}/notifications/unread-count?userId=${encodeURIComponent(user.userId)}`
+        : `/hospitals/${hospitalId}/notifications/unread-count`;
+      const notifRes = await authFetch(notifUrl);
       if (notifRes.ok) {
-        const count = await notifRes.json();
-        setUnreadNotifications(count || 0);
+        const countData = await notifRes.json();
+        const unread = typeof countData === 'number' ? countData : (countData?.unreadCount ?? 0);
+        setUnreadNotifications(unread);
       }
     } catch (error) {
       console.error('Error loading home data:', error);
@@ -203,6 +208,20 @@ export default function HomeScreen() {
           loadData();
         });
       }
+
+      // Subscribe to real-time doctor list updates
+      subscribeToDoctors(hospitalId, (updatedDoctor) => {
+        if (!updatedDoctor || !updatedDoctor.id) return;
+        setDoctors((prev) => {
+          const idx = prev.findIndex((d) => d.id === updatedDoctor.id);
+          if (idx >= 0) {
+            const next = [...prev];
+            next[idx] = { ...next[idx], ...updatedDoctor };
+            return next;
+          }
+          return [...prev, updatedDoctor];
+        });
+      });
 
       // Subscribe to queue topic if active ticket exists
       if (activeAppointment) {

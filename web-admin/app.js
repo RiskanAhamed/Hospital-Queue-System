@@ -4,6 +4,7 @@ let currentHospitalId = 'HOSP001_ID'; // Will be overridden from JWT auth
 let currentDoctorId = '';
 let stompClient = null;
 let queueStompSubscription = null;
+let doctorsStompSubscription = null;
 
 let queueData = [];
 let doctorsData = [];
@@ -34,6 +35,20 @@ document.addEventListener('DOMContentLoaded', () => {
         if (subPlanEl) {
             subPlanEl.textContent  = auth.label  || '★ Pro Plan';
             subPlanEl.className    = 'sub-plan ' + (auth.color || 'pro');
+        }
+
+        // Settings tab subscription plan display
+        const settingsPlanEl = document.getElementById('settingsPlanText');
+        if (settingsPlanEl) {
+            const planText = (auth.plan || 'PRO').toUpperCase();
+            settingsPlanEl.textContent = planText;
+            if (planText === 'PRO') {
+                settingsPlanEl.style.color = '#38BDF8';
+            } else if (planText === 'ENTERPRISE') {
+                settingsPlanEl.style.color = '#FBBF24';
+            } else {
+                settingsPlanEl.style.color = '#94A3B8';
+            }
         }
 
         // Locked hospital name
@@ -108,6 +123,23 @@ function fetchHospitalDetails() {
             if (phoneInput) phoneInput.value = hospital.phone || '';
             const emailInput = document.getElementById('settingsEmail');
             if (emailInput) emailInput.value = hospital.email || '';
+            const queueAlgoSelect = document.getElementById('queueAlgorithmSelect');
+            if (queueAlgoSelect) queueAlgoSelect.value = hospital.queueAlgorithm || 'FIFO';
+
+            // Populate SaaS Subscription Level info on Settings tab
+            const plan = (hospital.subscriptionPlan || 'BASIC').toUpperCase();
+            const settingsPlanEl = document.getElementById('settingsPlanText');
+            if (settingsPlanEl) {
+                settingsPlanEl.textContent = plan;
+                if (plan === 'PRO') {
+                    settingsPlanEl.style.color = '#38BDF8';
+                } else if (plan === 'ENTERPRISE') {
+                    settingsPlanEl.style.color = '#FBBF24';
+                } else {
+                    settingsPlanEl.style.color = '#94A3B8';
+                }
+            }
+            if (window.lucide) lucide.createIcons();
         })
         .catch(err => {
             console.error('Error fetching hospital subscription plan details:', err);
@@ -128,11 +160,12 @@ function saveHospitalSettings(event) {
     const address = (document.getElementById('settingsAddress')?.value || '').trim();
     const phone = (document.getElementById('settingsPhone')?.value || '').trim();
     const email = (document.getElementById('settingsEmail')?.value || '').trim();
+    const queueAlgorithm = (document.getElementById('queueAlgorithmSelect')?.value || 'FIFO').trim();
 
     authFetch(`${API_BASE}/hospitals/${currentHospitalId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newName, address, phone, email })
+        body: JSON.stringify({ name: newName, address, phone, email, queueAlgorithm })
     })
     .then(r => {
         if (!r.ok) {
@@ -147,6 +180,10 @@ function saveHospitalSettings(event) {
             if (brandBadge) brandBadge.textContent = updatedHospital.name;
             const lockedHosp = document.getElementById('lockedHospitalName');
             if (lockedHosp) lockedHosp.textContent = updatedHospital.name;
+        }
+        if (updatedHospital.queueAlgorithm) {
+            const queueAlgoSelect = document.getElementById('queueAlgorithmSelect');
+            if (queueAlgoSelect) queueAlgoSelect.value = updatedHospital.queueAlgorithm;
         }
     })
     .catch(err => {
@@ -352,6 +389,7 @@ function connectWebSocket() {
 
             subscribeToDoctorQueueTopic();
             subscribeToNotificationsTopic();
+            subscribeToDoctorsTopic();
             fetchUnreadNotificationsCount();
         }, (error) => {
             console.log('WS Connection error', error);
@@ -376,6 +414,53 @@ function subscribeToDoctorQueueTopic() {
         const updatedSummary = JSON.parse(message.body);
         handleLiveQueueUpdate(updatedSummary);
     });
+}
+
+function subscribeToDoctorsTopic() {
+    if (!stompClient || !stompClient.connected || !currentHospitalId) return;
+
+    if (doctorsStompSubscription) {
+        doctorsStompSubscription.unsubscribe();
+        doctorsStompSubscription = null;
+    }
+
+    const topic = `/topic/hospital/${currentHospitalId}/doctors`;
+    doctorsStompSubscription = stompClient.subscribe(topic, (message) => {
+        try {
+            const updatedDoctor = JSON.parse(message.body);
+            handleLiveDoctorUpdate(updatedDoctor);
+        } catch (e) {
+            console.error('Error parsing live doctor update:', e);
+        }
+    });
+}
+
+function handleLiveDoctorUpdate(updatedDoctor) {
+    if (!updatedDoctor || !updatedDoctor.id) return;
+
+    const idx = doctorsData.findIndex(d => d.id === updatedDoctor.id);
+    if (idx >= 0) {
+        doctorsData[idx] = { ...doctorsData[idx], ...updatedDoctor };
+    } else {
+        doctorsData.push(updatedDoctor);
+    }
+
+    // Refresh Doctor Dropdown in Queue Control Desk, Doctor Cards in Doctors & Schedules, and Department lists
+    populateDoctorDropdown();
+    renderDoctorRooms();
+    renderDoctorsGrid();
+    renderDepartments();
+
+    // Preserve selection in dropdown
+    const selectEl = document.getElementById('queueDoctorSelect');
+    if (selectEl && currentDoctorId && doctorsData.some(d => d.id === currentDoctorId)) {
+        selectEl.value = currentDoctorId;
+    } else if (doctorsData.length > 0) {
+        currentDoctorId = doctorsData[0].id;
+        if (selectEl) selectEl.value = currentDoctorId;
+        fetchQueueForCurrentDoctor();
+        subscribeToDoctorQueueTopic();
+    }
 }
 
 // Live Queue Update Handler

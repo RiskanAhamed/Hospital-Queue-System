@@ -4,6 +4,7 @@ import { WS_BASE } from './api';
 let stompClient: Client | null = null;
 let queueSubscription: any = null;
 let notificationSubscription: any = null;
+let doctorsSubscription: any = null;
 
 export interface QueueSummary {
   doctorId: string;
@@ -110,8 +111,41 @@ export function subscribeToNotifications(
   });
 }
 
+export function subscribeToDoctors(
+  hospitalId: string,
+  onMessage: (doctor: any) => void
+) {
+  if (!stompClient || !stompClient.connected) {
+    console.warn('STOMP Client is not connected');
+    return;
+  }
+
+  if (doctorsSubscription) {
+    doctorsSubscription.unsubscribe();
+    doctorsSubscription = null;
+  }
+
+  const topic = `/topic/hospital/${hospitalId}/doctors`;
+  doctorsSubscription = stompClient.subscribe(topic, (message: IMessage) => {
+    try {
+      const doctor = JSON.parse(message.body);
+      onMessage(doctor);
+    } catch (e) {
+      console.error('Error parsing doctor update:', e);
+    }
+  });
+}
+
+export function unsubscribeFromDoctors() {
+  if (doctorsSubscription) {
+    doctorsSubscription.unsubscribe();
+    doctorsSubscription = null;
+  }
+}
+
 export function disconnectWebSocket() {
   unsubscribeFromQueue();
+  unsubscribeFromDoctors();
   if (notificationSubscription) {
     notificationSubscription.unsubscribe();
     notificationSubscription = null;

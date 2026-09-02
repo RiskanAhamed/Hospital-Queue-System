@@ -688,3 +688,64 @@ body {
     margin-top: 24px;
 }
 
+/* Settings Tab Form */
+.settings-box .form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+    margin-top: 18px;
+}
+
+@media (max-width: 768px) {
+    .settings-box .form-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.settings-box .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.settings-box label {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--text-muted);
+}
+
+.settings-box input, .settings-box select {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--border-color);
+    padding: 10px 14px;
+    border-radius: 8px;
+    color: var(--text-main);
+    font-size: 0.9rem;
+    outline: none;
+    font-family: var(--font);
+    transition: border-color 0.2s ease;
+}
+
+.settings-box input:focus, .settings-box select:focus {
+    border-color: var(--primary);
+}
+
+.settings-box select option {
+    background: #0F172A;
+    color: var(--text-main);
+}
+
+.settings-box .readonly-info-line {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-color);
+    padding: 10px 14px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 0.88rem;
+    color: var(--text-main);
+    min-height: 42px;
+}
+
+

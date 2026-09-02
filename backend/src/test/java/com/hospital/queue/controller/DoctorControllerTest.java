@@ -14,9 +14,14 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.ResponseEntity;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
+
+import java.util.Collections;
+import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -31,6 +36,9 @@ public class DoctorControllerTest {
     @Mock
     private AuditLogService auditLogService;
 
+    @Mock
+    private SimpMessagingTemplate messagingTemplate;
+
     @InjectMocks
     private DoctorController doctorController;
 
@@ -43,7 +51,7 @@ public class DoctorControllerTest {
     }
 
     @Test
-    public void testCreateDoctorClearsSuppliedId() {
+    public void testCreateDoctorClearsSuppliedIdAndBroadcasts() {
         Doctor inputDoctor = new Doctor();
         inputDoctor.setId("ATTACKER_SUPPLIED_TARGET_DOCTOR_ID");
         inputDoctor.setName("Dr. Hijack");
@@ -68,5 +76,23 @@ public class DoctorControllerTest {
         verify(doctorRepository).save(captor.capture());
         assertEquals("HOSP001", captor.getValue().getHospitalId());
         verify(tenantSecurityService).validateTenantAccess("HOSP001", Role.HOSPITAL_ADMIN);
+        verify(messagingTemplate).convertAndSend(eq("/topic/hospital/HOSP001/doctors"), any(Doctor.class));
+    }
+
+    @Test
+    public void testUpdateDoctorAvailabilityBroadcasts() {
+        Doctor existing = new Doctor();
+        existing.setId("DOC001");
+        existing.setName("Dr. Smith");
+        existing.setHospitalId("HOSP001");
+        existing.setAvailable(true);
+
+        when(doctorRepository.findById("DOC001")).thenReturn(Optional.of(existing));
+        when(doctorRepository.save(any(Doctor.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        ResponseEntity<?> response = doctorController.updateDoctorAvailability("HOSP001", "DOC001", Collections.singletonMap("available", false));
+
+        assertEquals(200, response.getStatusCode().value());
+        verify(messagingTemplate).convertAndSend(eq("/topic/hospital/HOSP001/doctors"), any(Doctor.class));
     }
 }
