@@ -129,13 +129,16 @@
                 </button>
             </nav>
 
-            <!-- Subscription badge -->
-            <div class="subscription-badge">
+            <!-- Subscription badge with direct Upgrade button -->
+            <div class="subscription-badge" onclick="openUpgradePlanModal()" style="cursor:pointer;" title="Click to view plans & upgrade">
                 <span class="sub-icon">💳</span>
                 <div class="sub-info">
                     <div class="sub-label">Subscription</div>
                     <div class="sub-plan" id="subPlanText">Loading...</div>
                 </div>
+                <button class="btn btn-sm btn-primary" onclick="event.stopPropagation(); openUpgradePlanModal();" style="font-size:0.72rem; padding:4px 10px; margin-left:auto; border-radius:6px;">
+                    Upgrade
+                </button>
             </div>
 
             <!-- Locked per-tenant hospital info -->

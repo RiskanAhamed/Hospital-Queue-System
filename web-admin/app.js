@@ -9,6 +9,7 @@ let doctorsStompSubscription = null;
 let queueData = [];
 let doctorsData = [];
 let departmentsData = [];
+let currentSubscriptionPlan = 'PRO';
 
 function escapeHtml(str) {
     if (!str && str !== 0) return '';
@@ -128,6 +129,7 @@ function fetchHospitalDetails() {
 
             // Populate SaaS Subscription Level info on Settings tab
             const plan = (hospital.subscriptionPlan || 'BASIC').toUpperCase();
+            currentSubscriptionPlan = plan;
             const settingsPlanEl = document.getElementById('settingsPlanText');
             if (settingsPlanEl) {
                 settingsPlanEl.textContent = plan;
@@ -141,7 +143,7 @@ function fetchHospitalDetails() {
             }
 
             // Update Subscription Card & Quota Limits
-            updateSubscriptionTierUI(plan);
+            updateSubscriptionTierUI(currentSubscriptionPlan);
 
             if (window.lucide) lucide.createIcons();
         })
@@ -441,6 +443,7 @@ function fetchDoctorsList() {
             renderDoctorRooms();
             renderDoctorsGrid();
             renderDepartments();
+            updateSubscriptionTierUI(currentSubscriptionPlan);
 
             if (doctorsData.length > 0) {
                 // If currentDoctorId is not set or not in list, pick first doctor
@@ -1286,6 +1289,7 @@ function fetchDepartmentsList() {
             departmentsData = depts || [];
             renderDepartments();
             populateDoctorDepartmentSelect();
+            updateSubscriptionTierUI(currentSubscriptionPlan);
             return departmentsData;
         })
         .catch(err => {
