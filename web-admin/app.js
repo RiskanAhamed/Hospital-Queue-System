@@ -66,29 +66,46 @@ document.addEventListener('DOMContentLoaded', () => {
         if (roleEl)   roleEl.textContent   = getRoleLabel(auth.role);
         if (chipEl)   chipEl.textContent   = auth.role  || 'STAFF';
 
-        // Show/hide audit log and multi-tenant tabs based on role
-        const auditTab = document.getElementById('navAuditTab');
-        if (auditTab) {
-            if (auth.role === 'HOSPITAL_ADMIN' || auth.role === 'SUPER_ADMIN') {
-                auditTab.style.display = 'block';
-            } else {
-                auditTab.style.display = 'none';
-            }
-        }
+        // ── Strict Role-Based UI Filtering ──
+        const isAdmin = auth.role === 'HOSPITAL_ADMIN' || auth.role === 'SUPER_ADMIN';
+        const isSuperAdmin = auth.role === 'SUPER_ADMIN';
 
+        // Settings tab: Only Admin & Super Admin
+        const settingsTab = document.getElementById('navSettingsTab');
+        if (settingsTab) settingsTab.style.display = isAdmin ? 'flex' : 'none';
+
+        // Operational Reports tab: Only Admin & Super Admin
+        const reportsTab = document.getElementById('navReportsTab');
+        if (reportsTab) reportsTab.style.display = isAdmin ? 'flex' : 'none';
+
+        // Audit Log tab: Only Admin & Super Admin
+        const auditTab = document.getElementById('navAuditTab');
+        if (auditTab) auditTab.style.display = isAdmin ? 'flex' : 'none';
+
+        // Multi-Tenant tab & Switcher: Super Admin ONLY
         const hospitalsTab = document.getElementById('navHospitalsTab');
         const superAdminBox = document.getElementById('superAdminTenantBox');
         const hospLockBox = document.getElementById('hospitalLockBox');
 
-        if (auth.role === 'SUPER_ADMIN') {
-            if (hospitalsTab) hospitalsTab.style.display = 'block';
-            if (superAdminBox) superAdminBox.style.display = 'block';
-            if (hospLockBox) hospLockBox.style.display = 'none';
+        if (hospitalsTab) hospitalsTab.style.display = isSuperAdmin ? 'flex' : 'none';
+        if (superAdminBox) superAdminBox.style.display = isSuperAdmin ? 'block' : 'none';
+        if (hospLockBox) hospLockBox.style.display = isSuperAdmin ? 'none' : 'flex';
+
+        // Sidebar Upgrade Button: Only Admins can upgrade plan
+        const upgradeBtn = document.getElementById('btnSidebarUpgrade');
+        if (upgradeBtn) upgradeBtn.style.display = isAdmin ? 'inline-block' : 'none';
+
+        // Action Buttons: Only Admins can onboard doctors, staff, or departments
+        const addDoctorBtn = document.getElementById('btnAddDoctorBtn');
+        const addStaffBtn = document.getElementById('btnAddStaffBtn');
+        const addDeptBtn = document.getElementById('btnAddDepartmentBtn');
+
+        if (addDoctorBtn) addDoctorBtn.style.display = isAdmin ? 'inline-flex' : 'none';
+        if (addStaffBtn) addStaffBtn.style.display = isAdmin ? 'inline-flex' : 'none';
+        if (addDeptBtn) addDeptBtn.style.display = isAdmin ? 'inline-flex' : 'none';
+
+        if (isSuperAdmin) {
             fetchSuperAdminHospitalsList();
-        } else {
-            if (hospitalsTab) hospitalsTab.style.display = 'none';
-            if (superAdminBox) superAdminBox.style.display = 'none';
-            if (hospLockBox) hospLockBox.style.display = 'flex';
         }
     }
 
@@ -385,6 +402,21 @@ function handleSearch(query) {
 
 // Tab Switching
 function switchTab(tabId) {
+    const auth = window._auth || getAuth();
+    const role = auth ? auth.role : 'STAFF';
+    const isAdmin = role === 'HOSPITAL_ADMIN' || role === 'SUPER_ADMIN';
+    const isSuperAdmin = role === 'SUPER_ADMIN';
+
+    // Role-based navigation guard
+    if (['settings', 'reports', 'audit'].includes(tabId) && !isAdmin) {
+        alert('Access denied: Admin role required for this tab.');
+        return;
+    }
+    if (tabId === 'hospitals' && !isSuperAdmin) {
+        alert('Access denied: Super Admin role required for this tab.');
+        return;
+    }
+
     document.querySelectorAll('.tab-page').forEach(page => page.classList.remove('active'));
     document.querySelectorAll('.nav-item').forEach(item => item.classList.remove('active'));
 

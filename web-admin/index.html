@@ -111,15 +111,15 @@
                     <i data-lucide="calendar"></i>
                     <span>Master Appointments</span>
                 </button>
-                <button class="nav-item" onclick="switchTab('departments')">
+                <button class="nav-item" id="navDepartmentsTab" onclick="switchTab('departments')">
                     <i data-lucide="building-2"></i>
                     <span>Departments</span>
                 </button>
-                <button class="nav-item" onclick="switchTab('settings')">
+                <button class="nav-item" id="navSettingsTab" onclick="switchTab('settings')">
                     <i data-lucide="settings"></i>
                     <span>Hospital Settings</span>
                 </button>
-                <button class="nav-item" onclick="switchTab('reports')">
+                <button class="nav-item" id="navReportsTab" onclick="switchTab('reports')">
                     <i data-lucide="bar-chart-2"></i>
                     <span>Operational Reports</span>
                 </button>
@@ -140,7 +140,7 @@
                     <div class="sub-label">Subscription</div>
                     <div class="sub-plan" id="subPlanText">Loading...</div>
                 </div>
-                <button class="btn btn-sm btn-primary" onclick="event.stopPropagation(); openUpgradePlanModal();" style="font-size:0.72rem; padding:4px 10px; margin-left:auto; border-radius:6px;">
+                <button class="btn btn-sm btn-primary" id="btnSidebarUpgrade" onclick="event.stopPropagation(); openUpgradePlanModal();" style="font-size:0.72rem; padding:4px 10px; margin-left:auto; border-radius:6px;">
                     Upgrade
                 </button>
             </div>
@@ -363,10 +363,10 @@
                             <p>Manage hospital medical staff, rooms, and daily consultation slots.</p>
                         </div>
                         <div style="display:flex; gap:10px;">
-                            <button class="btn btn-secondary" onclick="openAddStaffModal()">
+                            <button class="btn btn-secondary" id="btnAddStaffBtn" onclick="openAddStaffModal()">
                                 <i data-lucide="shield"></i> Onboard Staff / User
                             </button>
-                            <button class="btn btn-primary" onclick="openAddDoctorModal()">
+                            <button class="btn btn-primary" id="btnAddDoctorBtn" onclick="openAddDoctorModal()">
                                 <i data-lucide="user-plus"></i> Onboard New Doctor
                             </button>
                         </div>
@@ -415,7 +415,7 @@
                             <h1>Hospital Departments</h1>
                             <p>Configure medical departments and specialty wings.</p>
                         </div>
-                        <button class="btn btn-primary" onclick="openAddDepartmentModal()"><i data-lucide="plus-circle"></i> Add Department</button>
+                        <button class="btn btn-primary" id="btnAddDepartmentBtn" onclick="openAddDepartmentModal()"><i data-lucide="plus-circle"></i> Add Department</button>
                     </div>
                     <div class="department-grid" id="departmentGrid">
                         <!-- Dynamic department cards -->
