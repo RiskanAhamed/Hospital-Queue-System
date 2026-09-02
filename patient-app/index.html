@@ -430,6 +430,32 @@
                 </div>
             </div>
         </div>
+
+        <!-- Patient Doctor Rating Modal -->
+        <div class="modal-overlay" id="patientRatingModal" style="display: none;">
+            <div class="modal-content glass" style="max-width: 360px;">
+                <div class="modal-header">
+                    <h3>Rate Doctor ⭐</h3>
+                    <button class="close-btn" onclick="closePatientRatingModal()">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="ratingApptId">
+                    <p id="ratingDocName" style="font-size:0.9rem; font-weight:700; color:#F8FAFC; text-align:center; margin-bottom:12px;">Doctor Name</p>
+                    <div style="display:flex; justify-content:center; gap:8px; margin-bottom:16px;" id="ratingStarContainer">
+                        <button type="button" onclick="setWebRatingScore(1)" class="star-btn" style="background:none; border:none; font-size:1.8rem; cursor:pointer; color:#FBBF24;">★</button>
+                        <button type="button" onclick="setWebRatingScore(2)" class="star-btn" style="background:none; border:none; font-size:1.8rem; cursor:pointer; color:#FBBF24;">★</button>
+                        <button type="button" onclick="setWebRatingScore(3)" class="star-btn" style="background:none; border:none; font-size:1.8rem; cursor:pointer; color:#FBBF24;">★</button>
+                        <button type="button" onclick="setWebRatingScore(4)" class="star-btn" style="background:none; border:none; font-size:1.8rem; cursor:pointer; color:#FBBF24;">★</button>
+                        <button type="button" onclick="setWebRatingScore(5)" class="star-btn" style="background:none; border:none; font-size:1.8rem; cursor:pointer; color:#FBBF24;">★</button>
+                    </div>
+                    <div class="form-group">
+                        <label>Review & Feedback (Optional)</label>
+                        <textarea id="ratingFeedbackComment" placeholder="Share details of your consultation experience..." style="width:100%; height:70px; padding:10px; border-radius:8px; border:1px solid rgba(255,255,255,0.1); background:rgba(0,0,0,0.3); color:#fff; font-family:var(--font); resize:none;"></textarea>
+                    </div>
+                    <button type="button" class="btn btn-primary btn-block" onclick="submitPatientRating()">Submit Rating</button>
+                </div>
+            </div>
+        </div>
     </div><!-- /.mobile-container -->
 
     <script src="app.js"></script>

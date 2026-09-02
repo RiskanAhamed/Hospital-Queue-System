@@ -285,8 +285,6 @@ function cancelMyAppointment() {
     });
 }
 
-// BUG 36 FIX: renderDoctorList accepts an optional pre-filtered array.
-// When no argument is supplied it renders the full doctorsData set.
 function renderDoctorList(data) {
     const doctors = data || doctorsData;
     const container = document.getElementById('doctorListContainer');
@@ -297,20 +295,27 @@ function renderDoctorList(data) {
         return;
     }
 
-    container.innerHTML = doctors.map(doc => `
-        <div class="doctor-card-item">
-            <div class="doc-info">
-                <h5>${escapeHtml(doc.name)}</h5>
-                <p>${escapeHtml(doc.departmentName || 'General')} &bull; ${escapeHtml(doc.roomNumber || 'Room --')}</p>
-                <p style="color:var(--primary); font-size:0.75rem; margin-top:2px;">${escapeHtml(doc.specialization || 'Specialist')}</p>
-                ${!doc.available ? '<span style="font-size:0.72rem; color:#F87171; font-weight:600; background:rgba(248,113,113,0.12); padding:2px 8px; border-radius:12px;">&#9679; On Leave</span>' : ''}
+    container.innerHTML = doctors.map(doc => {
+        const rating = doc.averageRating || 5.0;
+        const reviews = doc.totalRatings || 0;
+        return `
+            <div class="doctor-card-item">
+                <div class="doc-info">
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <h5>${escapeHtml(doc.name)}</h5>
+                        <span style="background:rgba(251,191,36,0.15); color:#FBBF24; padding:1px 6px; border-radius:8px; font-size:0.72rem; font-weight:700;">⭐ ${rating.toFixed(1)} ${reviews > 0 ? `(${reviews})` : ''}</span>
+                    </div>
+                    <p>${escapeHtml(doc.departmentName || 'General')} &bull; ${escapeHtml(doc.roomNumber || 'Room --')}</p>
+                    <p style="color:var(--primary); font-size:0.75rem; margin-top:2px;">${escapeHtml(doc.specialization || 'Specialist')}</p>
+                    ${!doc.available ? '<span style="font-size:0.72rem; color:#F87171; font-weight:600; background:rgba(248,113,113,0.12); padding:2px 8px; border-radius:12px;">&#9679; On Leave</span>' : ''}
+                </div>
+                ${ doc.available
+                    ? `<button class="btn-book" onclick="openBookingModal('${escapeHtml(doc.id)}', '${escapeHtml(doc.name)}', '${escapeHtml(doc.departmentName || 'General')}', '${escapeHtml(doc.roomNumber || '')}')">Book</button>`
+                    : `<button class="btn-book" disabled style="opacity:0.35; cursor:not-allowed;">Book</button>`
+                }
             </div>
-            ${ doc.available
-                ? `<button class="btn-book" onclick="openBookingModal('${escapeHtml(doc.id)}', '${escapeHtml(doc.name)}', '${escapeHtml(doc.departmentName || 'General')}', '${escapeHtml(doc.roomNumber || '')}')">Book</button>`
-                : `<button class="btn-book" disabled style="opacity:0.35; cursor:not-allowed;">Book</button>`
-            }
-        </div>
-    `).join('');
+        `;
+    }).join('');
 }
 
 // BUG 36 FIX: Pills now have onclick handlers that filter the doctor list.
@@ -803,6 +808,20 @@ function renderAppointmentHistory(appts) {
                     <span>&#128336; ${escapeHtml(appt.timeSlot || '—')}</span>
                     ${appt.queueNumber ? `<span>&#127915; Token: <strong style="color:var(--primary);">${escapeHtml(appt.queueNumber)}</strong></span>` : ''}
                 </div>
+                ${appt.status === 'COMPLETED' ? `
+                    <div style="margin-top:10px; padding-top:8px; border-top:1px solid rgba(255,255,255,0.06);">
+                        ${appt.rating ? `
+                            <div style="display:flex; align-items:center; justify-content:space-between;">
+                                <span style="color:#FBBF24; font-size:0.8rem; font-weight:700;">⭐ You Rated: ${appt.rating}/5 ${appt.feedbackComment ? `"${escapeHtml(appt.feedbackComment)}"` : ''}</span>
+                                <button onclick="openPatientRatingModal('${escapeHtml(appt.id)}', '${escapeHtml(appt.doctorName)}', ${appt.rating}, '${escapeHtml(appt.feedbackComment || '')}')" style="font-size:0.75rem; color:var(--primary); background:none; border:none; cursor:pointer;">Edit</button>
+                            </div>
+                        ` : `
+                            <button onclick="openPatientRatingModal('${escapeHtml(appt.id)}', '${escapeHtml(appt.doctorName)}', 5, '')" style="width:100%; font-size:0.8rem; color:#FBBF24; background:rgba(251,191,36,0.1); border:1px solid rgba(251,191,36,0.3); border-radius:8px; padding:6px; cursor:pointer; font-weight:700; display:flex; align-items:center; justify-content:center; gap:6px;">
+                                ⭐ Rate Doctor & Consultation
+                            </button>
+                        `}
+                    </div>
+                ` : ''}
                 ${canCancel ? `
                     <div style="display:flex; gap:8px; margin-top:8px;">
                         <button onclick="openPatientRescheduleModal('${escapeHtml(appt.id)}', '${escapeHtml(appt.doctorId)}', '${escapeHtml(appt.doctorName)}')" style="font-size:0.78rem; color:var(--primary); background:rgba(56,189,248,0.08); border:1px solid rgba(56,189,248,0.25); border-radius:8px; padding:5px 12px; cursor:pointer; font-family:var(--font);">Reschedule</button>
@@ -811,6 +830,65 @@ function renderAppointmentHistory(appts) {
                 ` : ''}
             </div>`;
     }).join('');
+}
+
+// Doctor Rating Modal Logic
+let currentWebRatingScore = 5;
+
+function openPatientRatingModal(apptId, doctorName, currentScore = 5, feedbackComment = '') {
+    document.getElementById('ratingApptId').value = apptId;
+    document.getElementById('ratingDocName').textContent = doctorName;
+    document.getElementById('ratingFeedbackComment').value = feedbackComment;
+    setWebRatingScore(currentScore || 5);
+    const modal = document.getElementById('patientRatingModal');
+    if (modal) modal.style.display = 'flex';
+}
+
+function closePatientRatingModal() {
+    const modal = document.getElementById('patientRatingModal');
+    if (modal) modal.style.display = 'none';
+}
+
+function setWebRatingScore(score) {
+    currentWebRatingScore = score;
+    const container = document.getElementById('ratingStarContainer');
+    if (!container) return;
+    const buttons = container.querySelectorAll('.star-btn');
+    buttons.forEach((btn, idx) => {
+        btn.style.color = idx < score ? '#FBBF24' : '#64748B';
+    });
+}
+
+function submitPatientRating() {
+    const apptId = document.getElementById('ratingApptId').value;
+    const feedback = document.getElementById('ratingFeedbackComment').value.trim();
+
+    if (!apptId || !currentHospitalId) return;
+
+    authFetch(`${API_BASE}/hospitals/${currentHospitalId}/appointments/${apptId}/rating`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            rating: currentWebRatingScore,
+            feedbackComment: feedback || undefined
+        })
+    })
+    .then(async r => {
+        if (!r.ok) {
+            const err = await r.text();
+            throw new Error(err || 'Failed to submit rating');
+        }
+        return r.json();
+    })
+    .then(() => {
+        alert('Thank you! Your feedback and star rating have been submitted successfully.');
+        closePatientRatingModal();
+        fetchAppointmentHistory();
+        fetchDoctorsList();
+    })
+    .catch(err => {
+        alert(err.message || 'Error submitting rating');
+    });
 }
 
 // Cancel an appointment from the history list by ID
