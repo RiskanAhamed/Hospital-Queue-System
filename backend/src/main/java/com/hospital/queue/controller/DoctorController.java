@@ -12,6 +12,8 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.Arrays;
+import com.hospital.queue.model.Hospital;
+import com.hospital.queue.repository.HospitalRepository;
 import java.util.List;
 
 @Slf4j
@@ -21,6 +23,7 @@ import java.util.List;
 public class DoctorController {
 
     private final DoctorRepository doctorRepository;
+    private final HospitalRepository hospitalRepository;
     private final TenantSecurityService tenantSecurityService;
     private final AuditLogService auditLogService;
     private final SimpMessagingTemplate messagingTemplate;
@@ -46,8 +49,25 @@ public class DoctorController {
     }
 
     @PostMapping
-    public ResponseEntity<Doctor> createDoctor(@PathVariable String hospitalId, @RequestBody Doctor doctor) {
+    public ResponseEntity<?> createDoctor(@PathVariable String hospitalId, @RequestBody Doctor doctor) {
         tenantSecurityService.validateTenantAccess(hospitalId, Role.HOSPITAL_ADMIN);
+
+        // Real SaaS Plan limit checks for doctors
+        Hospital hosp = hospitalRepository.findById(hospitalId).orElse(null);
+        if (hosp == null) {
+            hosp = hospitalRepository.findByCode(hospitalId).orElse(null);
+        }
+        if (hosp != null) {
+            String plan = hosp.getSubscriptionPlan();
+            long doctorCount = doctorRepository.findByHospitalId(hospitalId).size();
+            if ("BASIC".equalsIgnoreCase(plan) && doctorCount >= 2) {
+                return ResponseEntity.badRequest().body("Doctor limit reached for BASIC plan (max 2 doctors). Upgrade to PRO or ENTERPRISE to onboard more doctors.");
+            }
+            if ("PRO".equalsIgnoreCase(plan) && doctorCount >= 10) {
+                return ResponseEntity.badRequest().body("Doctor limit reached for PRO plan (max 10 doctors). Upgrade to ENTERPRISE for unlimited doctors.");
+            }
+        }
+
         doctor.setId(null);
         doctor.setHospitalId(hospitalId);
         if (doctor.getAvailableSlots() == null || doctor.getAvailableSlots().isEmpty()) {

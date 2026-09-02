@@ -118,6 +118,38 @@ public class HospitalController {
         }
     }
 
+    @PutMapping("/{hospitalId}/subscription")
+    public ResponseEntity<?> updateHospitalSubscription(@PathVariable String hospitalId, @RequestBody java.util.Map<String, String> payload) {
+        tenantSecurityService.validateTenantAccess(hospitalId, Role.HOSPITAL_ADMIN);
+
+        String plan = payload.get("subscriptionPlan");
+        if (plan == null || plan.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body("subscriptionPlan is required (BASIC, PRO, ENTERPRISE).");
+        }
+        plan = plan.trim().toUpperCase();
+        if (!plan.equals("BASIC") && !plan.equals("PRO") && !plan.equals("ENTERPRISE")) {
+            return ResponseEntity.badRequest().body("Invalid subscription plan. Allowed values: BASIC, PRO, ENTERPRISE.");
+        }
+
+        java.util.Optional<Hospital> hospOpt = hospitalRepository.findById(hospitalId);
+        if (hospOpt.isEmpty()) {
+            hospOpt = hospitalRepository.findByCode(hospitalId);
+        }
+        if (hospOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+
+        Hospital hospital = hospOpt.get();
+        String oldPlan = hospital.getSubscriptionPlan();
+        hospital.setSubscriptionPlan(plan);
+        Hospital saved = hospitalRepository.save(hospital);
+
+        auditLogService.log(hospitalId, tenantSecurityService.getCurrentUser().getUserId(), "SUBSCRIPTION_CHANGED", 
+                "Updated subscription plan from " + oldPlan + " to " + plan);
+
+        return ResponseEntity.ok(saved);
+    }
+
     @GetMapping("/{hospitalId}/departments")
     public ResponseEntity<List<Department>> getDepartments(@PathVariable String hospitalId) {
         tenantSecurityService.validateTenantAccess(hospitalId);
@@ -125,8 +157,22 @@ public class HospitalController {
     }
 
     @PostMapping("/{hospitalId}/departments")
-    public ResponseEntity<Department> createDepartment(@PathVariable String hospitalId, @RequestBody Department department) {
+    public ResponseEntity<?> createDepartment(@PathVariable String hospitalId, @RequestBody Department department) {
         tenantSecurityService.validateTenantAccess(hospitalId, Role.HOSPITAL_ADMIN);
+
+        // Real SaaS Plan limit checks for departments
+        Hospital hosp = hospitalRepository.findById(hospitalId).orElse(null);
+        if (hosp != null) {
+            String plan = hosp.getSubscriptionPlan();
+            long deptCount = departmentRepository.findByHospitalId(hospitalId).size();
+            if ("BASIC".equalsIgnoreCase(plan) && deptCount >= 1) {
+                return ResponseEntity.badRequest().body("Department limit reached for BASIC plan (max 1 department). Upgrade to PRO or ENTERPRISE to add more departments.");
+            }
+            if ("PRO".equalsIgnoreCase(plan) && deptCount >= 5) {
+                return ResponseEntity.badRequest().body("Department limit reached for PRO plan (max 5 departments). Upgrade to ENTERPRISE for unlimited departments.");
+            }
+        }
+
         department.setId(null);
         department.setHospitalId(hospitalId);
         Department saved = departmentRepository.save(department);

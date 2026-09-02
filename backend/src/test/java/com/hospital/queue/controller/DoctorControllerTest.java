@@ -31,6 +31,9 @@ public class DoctorControllerTest {
     private DoctorRepository doctorRepository;
 
     @Mock
+    private com.hospital.queue.repository.HospitalRepository hospitalRepository;
+
+    @Mock
     private TenantSecurityService tenantSecurityService;
 
     @Mock
@@ -65,12 +68,13 @@ public class DoctorControllerTest {
             return d;
         });
 
-        ResponseEntity<Doctor> response = doctorController.createDoctor("HOSP001", inputDoctor);
+        ResponseEntity<?> response = doctorController.createDoctor("HOSP001", inputDoctor);
 
         assertEquals(200, response.getStatusCode().value());
         assertNotNull(response.getBody());
-        assertEquals("NEW_GENERATED_ID", response.getBody().getId());
-        assertEquals("HOSP001", response.getBody().getHospitalId());
+        Doctor body = (Doctor) response.getBody();
+        assertEquals("NEW_GENERATED_ID", body.getId());
+        assertEquals("HOSP001", body.getHospitalId());
 
         ArgumentCaptor<Doctor> captor = ArgumentCaptor.forClass(Doctor.class);
         verify(doctorRepository).save(captor.capture());

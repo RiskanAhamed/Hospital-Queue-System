@@ -459,6 +459,55 @@
                             </div>
                         </form>
                     </div>
+
+                    <!-- Interactive SaaS Subscription & Quota Card -->
+                    <div class="subscription-card">
+                        <div class="sub-header-row">
+                            <div>
+                                <h3 style="font-size:1.15rem; font-weight:700; margin-bottom:4px;">SaaS Subscription & Tier Limits</h3>
+                                <p style="color:var(--text-muted); font-size:0.85rem;">Manage hospital plan capacity, feature access, and automated quotas.</p>
+                            </div>
+                            <div style="display:flex; align-items:center; gap:12px;">
+                                <span class="sub-plan-badge-lg pro" id="settingsPlanBadgeLg">★ PRO PLAN</span>
+                                <button class="btn btn-primary" onclick="openUpgradePlanModal()">
+                                    <i data-lucide="sparkles"></i> Change / Upgrade Plan
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Active Usage Progress -->
+                        <div class="sub-quota-grid">
+                            <div class="quota-item">
+                                <div class="quota-label">
+                                    <span>Doctor Capacity</span>
+                                    <strong id="quotaDoctorText">Loading...</strong>
+                                </div>
+                                <div class="quota-bar-track">
+                                    <div class="quota-bar-fill" id="quotaDoctorBar" style="width: 20%;"></div>
+                                </div>
+                            </div>
+
+                            <div class="quota-item">
+                                <div class="quota-label">
+                                    <span>Department Capacity</span>
+                                    <strong id="quotaDeptText">Loading...</strong>
+                                </div>
+                                <div class="quota-bar-track">
+                                    <div class="quota-bar-fill" id="quotaDeptBar" style="width: 40%;"></div>
+                                </div>
+                            </div>
+
+                            <div class="quota-item">
+                                <div class="quota-label">
+                                    <span>Queue Algorithm</span>
+                                    <strong style="color:var(--primary);">FIFO + Priority Call</strong>
+                                </div>
+                                <div class="quota-bar-track">
+                                    <div class="quota-bar-fill" style="width: 100%;"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </section>
 
                 <!-- TAB 7: REPORTS -->
@@ -833,6 +882,91 @@
                     <button type="submit" class="btn btn-primary">Confirm Reschedule</button>
                 </div>
             </form>
+        </div>
+    </div>
+
+    <!-- Modal 7: SaaS Subscription Upgrade Plan Modal -->
+    <div id="modalUpgradePlan" class="modal-overlay">
+        <div class="modal-card" style="max-width: 860px;">
+            <div class="modal-header">
+                <div>
+                    <h3>Hospital SaaS Subscription Plans</h3>
+                    <p style="color:var(--text-muted); font-size:0.85rem; margin-top:2px;">Select the right tier to increase doctor capacity and unlock advanced modules.</p>
+                </div>
+                <button class="close-btn" onclick="closeUpgradePlanModal()">&times;</button>
+            </div>
+            
+            <div class="pricing-modal-cards">
+                <!-- Basic Plan -->
+                <div class="pricing-card" id="cardPlanBasic">
+                    <div>
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <h4 style="font-size:1.1rem; font-weight:700;">Basic Tier</h4>
+                            <span class="sub-plan-badge-lg basic" style="font-size:0.7rem; padding:3px 8px;">STARTER</span>
+                        </div>
+                        <div class="plan-price">$29 <span>/ month</span></div>
+                        <p style="font-size:0.8rem; color:var(--text-muted);">Ideal for single clinics or small medical centers.</p>
+                        <ul class="plan-feature-list">
+                            <li><i data-lucide="check"></i> <strong>Max 2 Doctors</strong></li>
+                            <li><i data-lucide="check"></i> <strong>1 Department</strong></li>
+                            <li><i data-lucide="check"></i> Standard FIFO Queue Desk</li>
+                            <li><i data-lucide="check"></i> Patient Mobile App Access</li>
+                        </ul>
+                    </div>
+                    <button class="btn btn-secondary" id="btnSelectPlanBasic" onclick="applyPlanChange('BASIC')" style="width:100%; margin-top:14px;">
+                        Select Basic Plan
+                    </button>
+                </div>
+
+                <!-- Pro Plan -->
+                <div class="pricing-card featured" id="cardPlanPro">
+                    <div class="plan-ribbon">POPULAR CHOICE</div>
+                    <div>
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <h4 style="font-size:1.1rem; font-weight:700; color:var(--primary);">Pro Tier</h4>
+                            <span class="sub-plan-badge-lg pro" style="font-size:0.7rem; padding:3px 8px;">★ PRO</span>
+                        </div>
+                        <div class="plan-price">$99 <span>/ month</span></div>
+                        <p style="font-size:0.8rem; color:var(--text-muted);">For expanding clinics & general multi-specialty hospitals.</p>
+                        <ul class="plan-feature-list">
+                            <li><i data-lucide="check"></i> <strong>Up to 10 Doctors</strong></li>
+                            <li><i data-lucide="check"></i> <strong>Up to 5 Departments</strong></li>
+                            <li><i data-lucide="check"></i> Live WebSocket Queue Sync</li>
+                            <li><i data-lucide="check"></i> System Audit Trail & Logs</li>
+                            <li><i data-lucide="check"></i> Priority Consultation Call</li>
+                        </ul>
+                    </div>
+                    <button class="btn btn-primary" id="btnSelectPlanPro" onclick="applyPlanChange('PRO')" style="width:100%; margin-top:14px;">
+                        Upgrade to Pro
+                    </button>
+                </div>
+
+                <!-- Enterprise Plan -->
+                <div class="pricing-card" id="cardPlanEnterprise">
+                    <div>
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <h4 style="font-size:1.1rem; font-weight:700; color:#FBBF24;">Enterprise</h4>
+                            <span class="sub-plan-badge-lg enterprise" style="font-size:0.7rem; padding:3px 8px;">◆ ENTERPRISE</span>
+                        </div>
+                        <div class="plan-price">$299 <span>/ month</span></div>
+                        <p style="font-size:0.8rem; color:var(--text-muted);">For large hospital networks requiring unlimited capacity.</p>
+                        <ul class="plan-feature-list">
+                            <li><i data-lucide="check"></i> <strong>Unlimited Doctors</strong></li>
+                            <li><i data-lucide="check"></i> <strong>Unlimited Departments</strong></li>
+                            <li><i data-lucide="check"></i> 30-Day Operational Reports</li>
+                            <li><i data-lucide="check"></i> Complete Audit Compliance</li>
+                            <li><i data-lucide="check"></i> 24/7 Dedicated Support</li>
+                        </ul>
+                    </div>
+                    <button class="btn btn-secondary" id="btnSelectPlanEnterprise" onclick="applyPlanChange('ENTERPRISE')" style="width:100%; margin-top:14px; border-color:rgba(251,191,36,0.4); color:#FBBF24;">
+                        Upgrade to Enterprise
+                    </button>
+                </div>
+            </div>
+
+            <div class="modal-footer" style="border-top:1px solid var(--border-color); padding-top:16px;">
+                <button type="button" class="btn btn-secondary" onclick="closeUpgradePlanModal()">Close</button>
+            </div>
         </div>
     </div>
 

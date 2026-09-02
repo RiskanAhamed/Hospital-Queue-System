@@ -139,11 +139,136 @@ function fetchHospitalDetails() {
                     settingsPlanEl.style.color = '#94A3B8';
                 }
             }
+
+            // Update Subscription Card & Quota Limits
+            updateSubscriptionTierUI(plan);
+
             if (window.lucide) lucide.createIcons();
         })
         .catch(err => {
             console.error('Error fetching hospital subscription plan details:', err);
         });
+}
+
+function updateSubscriptionTierUI(plan) {
+    const badgeEl = document.getElementById('settingsPlanBadgeLg');
+    if (badgeEl) {
+        if (plan === 'PRO') {
+            badgeEl.textContent = '★ PRO PLAN ($99/mo)';
+            badgeEl.className = 'sub-plan-badge-lg pro';
+        } else if (plan === 'ENTERPRISE') {
+            badgeEl.textContent = '◆ ENTERPRISE PLAN ($299/mo)';
+            badgeEl.className = 'sub-plan-badge-lg enterprise';
+        } else {
+            badgeEl.textContent = '✦ BASIC PLAN ($29/mo)';
+            badgeEl.className = 'sub-plan-badge-lg basic';
+        }
+    }
+
+    // Doctor Quotas: Basic = 2, Pro = 10, Enterprise = Unlimited
+    const currentDocs = doctorsData.length || 0;
+    const docTextEl = document.getElementById('quotaDoctorText');
+    const docBarEl = document.getElementById('quotaDoctorBar');
+    if (docTextEl && docBarEl) {
+        if (plan === 'ENTERPRISE') {
+            docTextEl.textContent = `${currentDocs} Active (Unlimited)`;
+            docBarEl.style.width = '25%';
+            docBarEl.className = 'quota-bar-fill';
+        } else {
+            const maxDocs = plan === 'PRO' ? 10 : 2;
+            const pct = Math.min(100, Math.round((currentDocs / maxDocs) * 100));
+            docTextEl.textContent = `${currentDocs} / ${maxDocs} (${pct}%)`;
+            docBarEl.style.width = `${pct}%`;
+            docBarEl.className = `quota-bar-fill ${pct >= 100 ? 'danger' : pct >= 75 ? 'warning' : ''}`;
+        }
+    }
+
+    // Department Quotas: Basic = 1, Pro = 5, Enterprise = Unlimited
+    const currentDepts = departmentsData.length || 0;
+    const deptTextEl = document.getElementById('quotaDeptText');
+    const deptBarEl = document.getElementById('quotaDeptBar');
+    if (deptTextEl && deptBarEl) {
+        if (plan === 'ENTERPRISE') {
+            deptTextEl.textContent = `${currentDepts} Active (Unlimited)`;
+            deptBarEl.style.width = '25%';
+            deptBarEl.className = 'quota-bar-fill';
+        } else {
+            const maxDepts = plan === 'PRO' ? 5 : 1;
+            const pct = Math.min(100, Math.round((currentDepts / maxDepts) * 100));
+            deptTextEl.textContent = `${currentDepts} / ${maxDepts} (${pct}%)`;
+            deptBarEl.style.width = `${pct}%`;
+            deptBarEl.className = `quota-bar-fill ${pct >= 100 ? 'danger' : pct >= 75 ? 'warning' : ''}`;
+        }
+    }
+}
+
+// Subscription Plan Modal Handlers
+function openUpgradePlanModal() {
+    const modal = document.getElementById('modalUpgradePlan');
+    if (!modal) return;
+
+    // Fetch latest hospital plan to highlight current card
+    authFetch(`${API_BASE}/hospitals/${currentHospitalId}`)
+        .then(r => r.ok ? r.json() : null)
+        .then(hosp => {
+            const currentPlan = hosp ? (hosp.subscriptionPlan || 'BASIC').toUpperCase() : 'BASIC';
+            
+            const btnBasic = document.getElementById('btnSelectPlanBasic');
+            const btnPro = document.getElementById('btnSelectPlanPro');
+            const btnEnt = document.getElementById('btnSelectPlanEnterprise');
+
+            if (btnBasic) {
+                btnBasic.textContent = currentPlan === 'BASIC' ? '✓ Current Active Plan' : 'Switch to Basic';
+                btnBasic.disabled = currentPlan === 'BASIC';
+            }
+            if (btnPro) {
+                btnPro.textContent = currentPlan === 'PRO' ? '✓ Current Active Plan' : (currentPlan === 'ENTERPRISE' ? 'Downgrade to Pro' : 'Upgrade to Pro');
+                btnPro.disabled = currentPlan === 'PRO';
+            }
+            if (btnEnt) {
+                btnEnt.textContent = currentPlan === 'ENTERPRISE' ? '✓ Current Active Plan' : 'Upgrade to Enterprise';
+                btnEnt.disabled = currentPlan === 'ENTERPRISE';
+            }
+
+            modal.classList.add('active');
+            if (window.lucide) lucide.createIcons();
+        })
+        .catch(() => {
+            modal.classList.add('active');
+        });
+}
+
+function closeUpgradePlanModal() {
+    const modal = document.getElementById('modalUpgradePlan');
+    if (modal) modal.classList.remove('active');
+}
+
+function applyPlanChange(newPlan) {
+    if (!confirm(`Are you sure you want to change your hospital subscription plan to ${newPlan}?`)) {
+        return;
+    }
+
+    authFetch(`${API_BASE}/hospitals/${currentHospitalId}/subscription`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subscriptionPlan: newPlan })
+    })
+    .then(async r => {
+        if (!r.ok) {
+            const errText = await r.text();
+            throw new Error(errText || 'Failed to update subscription plan');
+        }
+        return r.json();
+    })
+    .then(savedHospital => {
+        closeUpgradePlanModal();
+        alert(`🎉 Subscription plan updated to ${newPlan} successfully!`);
+        fetchHospitalDetails();
+    })
+    .catch(err => {
+        console.error('Error changing subscription plan:', err);
+        alert(err.message || 'Error updating subscription plan.');
+    });
 }
 
 function saveHospitalSettings(event) {

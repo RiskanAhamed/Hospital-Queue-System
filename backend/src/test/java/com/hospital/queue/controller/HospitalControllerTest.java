@@ -72,12 +72,13 @@ public class HospitalControllerTest {
             return d;
         });
 
-        ResponseEntity<Department> response = hospitalController.createDepartment("HOSP001", inputDepartment);
+        ResponseEntity<?> response = hospitalController.createDepartment("HOSP001", inputDepartment);
 
         assertEquals(200, response.getStatusCode().value());
         assertNotNull(response.getBody());
-        assertEquals("NEW_DEPT_ID", response.getBody().getId());
-        assertEquals("HOSP001", response.getBody().getHospitalId());
+        Department body = (Department) response.getBody();
+        assertEquals("NEW_DEPT_ID", body.getId());
+        assertEquals("HOSP001", body.getHospitalId());
         verify(tenantSecurityService).validateTenantAccess("HOSP001", Role.HOSPITAL_ADMIN);
     }
 
