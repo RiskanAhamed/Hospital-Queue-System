@@ -29,6 +29,12 @@ function requireAuth() {
         window.location.href = 'login.html';
         return null;
     }
+    if (auth.role === 'PATIENT') {
+        localStorage.removeItem(AUTH_KEY);
+        alert('Access Denied: Patient accounts are not permitted to access the Hospital Admin Portal. Please use the Patient App.');
+        window.location.href = 'login.html';
+        return null;
+    }
     return auth;
 }
 

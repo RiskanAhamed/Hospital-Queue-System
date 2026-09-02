@@ -307,10 +307,6 @@
                     </button>
                 </form>
 
-                <div class="register-link-row">
-                    Don't have an account? <a href="#" onclick="openRegisterModal(event)">Register here</a>
-                </div>
-
                 <div class="divider">or try a demo account</div>
 
                 <div class="demo-box">
@@ -348,75 +344,21 @@
         </div>
     </div>
 
-    <!-- Registration Modal -->
-    <div class="modal-overlay" id="registerModal">
-        <div class="modal-card">
-            <div class="modal-header">
-                <h3>Create Account 🏥</h3>
-                <button class="close-modal" onclick="closeRegisterModal(event)">&times;</button>
-            </div>
-            <p style="color:var(--text-muted); font-size:0.85rem; margin-bottom:20px;">
-                Register a patient account linked to your hospital code.
-            </p>
-
-            <div class="alert-box" id="regAlertBox">
-                <span>⚠️</span>
-                <span id="regAlertText"></span>
-            </div>
-
-            <form id="registerForm" onsubmit="handleRegister(event)" novalidate>
-                <div class="form-group">
-                    <label for="regName">Full Name</label>
-                    <div class="input-wrapper">
-                        <span class="input-icon">👤</span>
-                        <input type="text" id="regName" class="form-input" placeholder="e.g. David Miller" required>
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label for="regEmail">Email Address</label>
-                    <div class="input-wrapper">
-                        <span class="input-icon">✉️</span>
-                        <input type="email" id="regEmail" class="form-input" placeholder="patient@gmail.com" required>
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label for="regPassword">Password</label>
-                    <div class="input-wrapper">
-                        <span class="input-icon">🔒</span>
-                        <input type="password" id="regPassword" class="form-input" placeholder="Create a password" required>
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label for="regHospitalCode">Hospital Code</label>
-                    <div class="input-wrapper">
-                        <span class="input-icon">🏥</span>
-                        <input type="text" id="regHospitalCode" class="form-input" placeholder="e.g. HOSP001 or HOSP002" required>
-                    </div>
-                </div>
-
-                <button type="submit" class="btn-login" id="regSubmitBtn" style="margin-top:16px;">
-                    <span id="regBtnText">Register Account</span>
-                </button>
-
-                <div style="text-align:center; margin-top:16px; font-size:0.85rem; color:var(--text-muted);">
-                    Already have an account? <a href="#" onclick="closeRegisterModal(event)" style="color:var(--primary); font-weight:600; text-decoration:none;">Sign in</a>
-                </div>
-            </form>
-        </div>
-    </div>
-
     <script>
         const API_BASE = 'https://hospital-queue-system-production.up.railway.app/api/v1';
         const AUTH_KEY = 'mediflow_auth';
 
-        // If already logged in, go to dashboard
+        // If already logged in as Staff/Doctor/Admin, go to dashboard
         (function () {
             try {
                 const auth = JSON.parse(localStorage.getItem(AUTH_KEY) || 'null');
-                if (auth && auth.token) window.location.href = 'index.html';
+                if (auth && auth.token) {
+                    if (auth.role === 'PATIENT') {
+                        localStorage.removeItem(AUTH_KEY);
+                    } else {
+                        window.location.href = 'index.html';
+                    }
+                }
             } catch(e) { localStorage.removeItem(AUTH_KEY); }
         })();
 
@@ -444,66 +386,6 @@
             box.className = 'alert-box ' + type;
             box.style.display = 'flex';
             setTimeout(() => { box.style.display = 'none'; }, 5000);
-        }
-
-        function openRegisterModal(e) {
-            if (e) e.preventDefault();
-            document.getElementById('registerModal').classList.add('active');
-        }
-
-        function closeRegisterModal(e) {
-            if (e) e.preventDefault();
-            document.getElementById('registerModal').classList.remove('active');
-        }
-
-        function showRegAlert(msg, type='error') {
-            const box = document.getElementById('regAlertBox');
-            box.querySelector('span').textContent = type === 'error' ? '⚠️' : '✅';
-            document.getElementById('regAlertText').textContent = msg;
-            box.className = 'alert-box ' + type;
-            box.style.display = 'flex';
-        }
-
-        async function handleRegister(e) {
-            e.preventDefault();
-            const name         = document.getElementById('regName').value.trim();
-            const email        = document.getElementById('regEmail').value.trim().toLowerCase();
-            const password     = document.getElementById('regPassword').value;
-            const hospitalCode = document.getElementById('regHospitalCode').value.trim().toUpperCase();
-
-            if (!name || !email || !password || !hospitalCode) {
-                showRegAlert('Please fill in all required fields.');
-                return;
-            }
-
-            const regBtn = document.getElementById('regSubmitBtn');
-            const regBtnText = document.getElementById('regBtnText');
-            regBtn.disabled = true;
-            regBtnText.textContent = 'Registering...';
-
-            try {
-                const res = await fetch(`${API_BASE}/auth/register`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ name, email, password, role: 'PATIENT', hospitalCode })
-                });
-
-                if (res.ok) {
-                    const data = await res.json();
-                    closeRegisterModal();
-                    document.getElementById('loginEmail').value = email;
-                    document.getElementById('loginPassword').value = password;
-                    showAlert('Account registered successfully! Please click Sign In.', 'success');
-                } else {
-                    const errText = await res.text();
-                    showRegAlert(errText || 'Registration failed. Please check hospital code.');
-                }
-            } catch (err) {
-                showRegAlert('Could not connect to server. Please try again.');
-            } finally {
-                regBtn.disabled = false;
-                regBtnText.textContent = 'Register Account';
-            }
         }
 
         function setLoading(on) {
@@ -535,7 +417,13 @@
                     body: JSON.stringify({ email, password })
                 });
                 if (res.ok) {
-                    saveAndRedirect(await res.json());
+                    const data = await res.json();
+                    if (data.role === 'PATIENT') {
+                        showAlert('Access Denied: Patient accounts cannot log in to the Hospital Admin portal. Please use the Patient Mobile App.', 'error');
+                        setLoading(false);
+                        return;
+                    }
+                    saveAndRedirect(data);
                 } else {
                     if (res.status === 429) {
                         showAlert('🚫 LOCKED OUT: ' + (await res.text()));
