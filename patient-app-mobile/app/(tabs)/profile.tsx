@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -6,13 +6,41 @@ import {
   TouchableOpacity,
   ScrollView,
   Platform,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { disconnectWebSocket } from '../../utils/websocket';
+import { authFetch } from '../../utils/api';
 
 export default function ProfileScreen() {
   const { user, hospitalName, logout } = useAuth();
+  const [selectedLanguage, setSelectedLanguage] = useState<'ta' | 'en'>('ta');
+  const [savingLang, setSavingLang] = useState(false);
+
+  const handleLanguageChange = async (lang: 'ta' | 'en') => {
+    setSelectedLanguage(lang);
+    setSavingLang(true);
+    try {
+      const res = await authFetch('/auth/profile/language', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ language: lang }),
+      });
+      if (res.ok) {
+        Alert.alert(
+          'Language Updated',
+          lang === 'ta'
+            ? 'அறிவிப்புகள் இனி தமிழில் வரும். (Notifications set to Tamil)'
+            : 'Notifications will now be delivered in English.'
+        );
+      }
+    } catch (e) {
+      console.log('Error updating language preference:', e);
+    } finally {
+      setSavingLang(false);
+    }
+  };
 
   const handleLogout = async () => {
     disconnectWebSocket();
@@ -57,6 +85,50 @@ export default function ProfileScreen() {
           <View style={styles.detailRow}>
             <Text style={styles.detailLabel}>Account Role</Text>
             <Text style={[styles.detailValue, styles.roleValue]}>Patient</Text>
+          </View>
+
+          {/* Notification Language Preference */}
+          <View style={[styles.detailRow, { flexDirection: 'column', alignItems: 'flex-start', gap: 8 }]}>
+            <Text style={styles.detailLabel}>Notification Language (அறிவிப்பு மொழி)</Text>
+            <View style={{ flexDirection: 'row', gap: 10, width: '100%', marginTop: 4 }}>
+              <TouchableOpacity
+                style={{
+                  flex: 1,
+                  paddingVertical: 10,
+                  paddingHorizontal: 12,
+                  borderRadius: 8,
+                  backgroundColor: selectedLanguage === 'ta' ? 'rgba(56, 189, 248, 0.2)' : 'rgba(255, 255, 255, 0.04)',
+                  borderColor: selectedLanguage === 'ta' ? '#38BDF8' : 'rgba(255, 255, 255, 0.1)',
+                  borderWidth: 1,
+                  alignItems: 'center',
+                }}
+                onPress={() => handleLanguageChange('ta')}
+                disabled={savingLang}
+              >
+                <Text style={{ color: selectedLanguage === 'ta' ? '#38BDF8' : '#94A3B8', fontWeight: '700', fontSize: 13 }}>
+                  🇮🇳 தமிழ் (Tamil)
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={{
+                  flex: 1,
+                  paddingVertical: 10,
+                  paddingHorizontal: 12,
+                  borderRadius: 8,
+                  backgroundColor: selectedLanguage === 'en' ? 'rgba(56, 189, 248, 0.2)' : 'rgba(255, 255, 255, 0.04)',
+                  borderColor: selectedLanguage === 'en' ? '#38BDF8' : 'rgba(255, 255, 255, 0.1)',
+                  borderWidth: 1,
+                  alignItems: 'center',
+                }}
+                onPress={() => handleLanguageChange('en')}
+                disabled={savingLang}
+              >
+                <Text style={{ color: selectedLanguage === 'en' ? '#38BDF8' : '#94A3B8', fontWeight: '700', fontSize: 13 }}>
+                  🇬🇧 English
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
 

@@ -40,6 +40,9 @@ public class QueueServiceTest {
     private DoctorRepository doctorRepository;
 
     @Mock
+    private com.hospital.queue.repository.UserRepository userRepository;
+
+    @Mock
     private SimpMessagingTemplate messagingTemplate;
 
     @Mock
@@ -56,6 +59,7 @@ public class QueueServiceTest {
                 queueRepository,
                 appointmentRepository,
                 doctorRepository,
+                userRepository,
                 messagingTemplate,
                 notificationService,
                 mongoTemplate

@@ -268,4 +268,20 @@ public class AuthController {
         }
         return ResponseEntity.badRequest().body("Invalid pushToken.");
     }
+
+    @PutMapping("/profile/language")
+    public ResponseEntity<?> updateLanguagePreference(@RequestBody java.util.Map<String, String> body) {
+        UserPrincipal currentUser = tenantSecurityService.getCurrentUser();
+        String lang = body.get("language");
+        if (lang != null && (lang.equalsIgnoreCase("ta") || lang.equalsIgnoreCase("en"))) {
+            User user = userRepository.findById(currentUser.getUserId()).orElse(null);
+            if (user != null) {
+                user.setPreferredLanguage(lang.toLowerCase());
+                userRepository.save(user);
+                log.info("Updated language preference for user {}: {}", user.getEmail(), user.getPreferredLanguage());
+                return ResponseEntity.ok(java.util.Map.of("message", "Language preference updated.", "language", user.getPreferredLanguage()));
+            }
+        }
+        return ResponseEntity.badRequest().body("Invalid language. Supported: 'ta' (Tamil), 'en' (English).");
+    }
 }

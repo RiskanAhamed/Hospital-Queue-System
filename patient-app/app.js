@@ -915,6 +915,31 @@ function populateProfileTab() {
     const pn = document.getElementById('profileName'); if (pn) pn.textContent = auth.name || 'Patient';
     const pe = document.getElementById('profileEmail'); if (pe) pe.textContent = auth.email || '—';
     const ph = document.getElementById('profileHospital'); if (ph) ph.textContent = auth.hospitalName || auth.hospitalId || '—';
+    const pl = document.getElementById('profileLanguageSelect');
+    if (pl) {
+        pl.value = auth.preferredLanguage || localStorage.getItem('mediflow_patient_lang') || 'ta';
+    }
+}
+
+function updateWebPatientLanguage(lang) {
+    localStorage.setItem('mediflow_patient_lang', lang);
+    const auth = getPatientAuth();
+    if (auth) {
+        auth.preferredLanguage = lang;
+        localStorage.setItem(PATIENT_AUTH_KEY, JSON.stringify(auth));
+    }
+    authFetch(`${API_BASE}/auth/profile/language`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ language: lang })
+    })
+    .then(r => r.ok ? r.json() : null)
+    .then(() => {
+        alert(lang === 'ta' 
+            ? 'அறிவிப்புகள் இனி தமிழில் வரும். (Notifications set to Tamil)' 
+            : 'Notifications will now be delivered in English.');
+    })
+    .catch(err => console.log('Error updating language preference:', err));
 }
 
 // --- Missing Spec Features: Patient Notifications ---

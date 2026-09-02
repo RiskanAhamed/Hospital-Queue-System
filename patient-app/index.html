@@ -216,6 +216,13 @@
                         <span style="font-size:0.82rem; color:var(--text-muted);">Account Role</span>
                         <span style="font-size:0.85rem; font-weight:600; color:var(--success);">Patient</span>
                     </div>
+                    <div style="background:rgba(255,255,255,0.04); border:1px solid var(--border-color); border-radius:12px; padding:14px 16px; display:flex; justify-content:space-between; align-items:center;">
+                        <span style="font-size:0.82rem; color:var(--text-muted);">Notification Language (அறிவிப்பு மொழி)</span>
+                        <select id="profileLanguageSelect" onchange="updateWebPatientLanguage(this.value)" style="background:#0F172A; color:#38BDF8; border:1px solid rgba(56,189,248,0.3); border-radius:8px; padding:4px 8px; font-family:var(--font); font-size:0.82rem; font-weight:700; cursor:pointer;">
+                            <option value="ta">🇮🇳 தமிழ் (Tamil)</option>
+                            <option value="en">🇬🇧 English</option>
+                        </select>
+                    </div>
                 </div>
                 <button onclick="patientLogout()" style="width:100%; margin-top:24px; padding:14px; background:rgba(248,113,113,0.1); border:1px solid rgba(248,113,113,0.3); color:#F87171; border-radius:12px; font-family:var(--font); font-size:0.9rem; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px;">
                     <i data-lucide="log-out"></i> Sign Out

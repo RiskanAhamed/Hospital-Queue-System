@@ -33,9 +33,21 @@ public class QueueService {
     private final QueueRepository queueRepository;
     private final AppointmentRepository appointmentRepository;
     private final DoctorRepository doctorRepository;
+    private final com.hospital.queue.repository.UserRepository userRepository;
     private final SimpMessagingTemplate messagingTemplate;
     private final NotificationService notificationService;
     private final MongoTemplate mongoTemplate;
+
+    private String getPatientLanguage(String patientId) {
+        if (patientId == null || patientId.trim().isEmpty()) return "ta";
+        try {
+            return userRepository.findById(patientId)
+                    .map(com.hospital.queue.model.User::getPreferredLanguage)
+                    .orElse("ta");
+        } catch (Exception e) {
+            return "ta";
+        }
+    }
 
     /**
      * FIX #9: Atomically generate the next sequence number for a doctor's queue on a given date.
@@ -127,12 +139,18 @@ public class QueueService {
             String roomNum = docOpt.map(Doctor::getRoomNumber).orElse("TBD");
             String doctorName = docOpt.map(Doctor::getName).orElse("your doctor");
 
+            String langTurn = getPatientLanguage(updated.getPatientId());
+            String turnTitle = "en".equalsIgnoreCase(langTurn) ? "It's your turn" : "உங்கள் முறை வந்துவிட்டது! (It's your turn)";
+            String turnMsg = "en".equalsIgnoreCase(langTurn) 
+                    ? "Please proceed to Room " + roomNum + " for Doctor " + doctorName + "."
+                    : "தயவுசெய்து Dr. " + doctorName + "-ஐ சந்திக்க அறை " + roomNum + "-க்குள் செல்லவும்.";
+
             notificationService.createAndSendNotification(
                     hospitalId,
                     updated.getPatientId(),
                     "QUEUE_TURN",
-                    "It's your turn",
-                    "Please proceed to Room " + roomNum + " for Doctor " + doctorName + "."
+                    turnTitle,
+                    turnMsg
             );
 
             // Fetch upcoming waiting patients for proximity alerts
@@ -144,24 +162,36 @@ public class QueueService {
             // 1. Alert the patient directly next in line (1 away)
             if (waitingList.size() > 0) {
                 QueueEntry next1 = waitingList.get(0);
+                String langNext = getPatientLanguage(next1.getPatientId());
+                String nextTitle = "en".equalsIgnoreCase(langNext) ? "You're next, please be ready" : "அடுத்து உங்கள் முறை! (You're Next)";
+                String nextMsg = "en".equalsIgnoreCase(langNext)
+                        ? "You are next in line for Doctor " + doctorName + ". Please be ready near Room " + roomNum + "."
+                        : "Dr. " + doctorName + "-க்கு அடுத்து உங்கள் முறை. தயவுசெய்து அறை " + roomNum + " அருகே தயாராக இருக்கவும்.";
+
                 notificationService.createAndSendNotification(
                         hospitalId,
                         next1.getPatientId(),
                         "QUEUE_NEXT",
-                        "You're next, please be ready",
-                        "You are next in line for Doctor " + doctorName + ". Please be ready near Room " + roomNum + "."
+                        nextTitle,
+                        nextMsg
                 );
             }
 
             // 2. Alert the patient 2 tokens away (Proximity Alert)
             if (waitingList.size() > 1) {
                 QueueEntry next2 = waitingList.get(1);
+                String langProx = getPatientLanguage(next2.getPatientId());
+                String proxTitle = "en".equalsIgnoreCase(langProx) ? "Your turn is approaching (2 tokens away)" : "வரிசை எச்சரிக்கை (2 டோக்கன்கள் உள்ளன)";
+                String proxMsg = "en".equalsIgnoreCase(langProx)
+                        ? "Only 2 patients ahead for Doctor " + doctorName + " in Room " + roomNum + ". Please head towards the waiting area."
+                        : "Dr. " + doctorName + "-ஐ சந்திக்க இன்னும் 2 நபர்களே உள்ளனர் (அறை " + roomNum + "). தயவுசெய்து காத்திருப்பு பகுதிக்கு வரவும்.";
+
                 notificationService.createAndSendNotification(
                         hospitalId,
                         next2.getPatientId(),
                         "QUEUE_PROXIMITY_ALERT",
-                        "Your turn is approaching (2 tokens away)",
-                        "Only 2 patients ahead for Doctor " + doctorName + " in Room " + roomNum + ". Please head towards the waiting area."
+                        proxTitle,
+                        proxMsg
                 );
             }
 

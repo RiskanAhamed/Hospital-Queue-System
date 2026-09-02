@@ -27,6 +27,7 @@ public class User {
     private String password;
     private String phone;
     private String pushToken; // Expo Push Token (e.g. ExponentPushToken[...])
+    private String preferredLanguage = "ta"; // "ta" (Tamil) or "en" (English)
     private Role role;
     private boolean active = true;
     private LocalDateTime createdAt = LocalDateTime.now();
