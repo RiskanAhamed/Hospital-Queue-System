@@ -1825,4 +1825,345 @@ function submitRescheduleAppointment(e) {
     .catch(err => alert(err.message || 'Error rescheduling appointment'));
 }
 
+// ══════════════════════════════════════════════════════════════════════════════════
+// 📊 OPERATIONAL REPORTS & EXECUTIVE EXPORTS ENGINE
+// ══════════════════════════════════════════════════════════════════════════════════
+
+let _cachedReportData = {
+    appointmentsByDate: [],
+    cancelStats: {},
+    doctorWorkload: [],
+    departmentWorkload: [],
+    allAppointments: []
+};
+
+function fetchReports() {
+    if (!currentHospitalId) return;
+
+    Promise.all([
+        authFetch(`${API_BASE}/hospitals/${currentHospitalId}/reports/appointments-by-date`).then(r => r.ok ? r.json() : []),
+        authFetch(`${API_BASE}/hospitals/${currentHospitalId}/reports/cancellation-stats`).then(r => r.ok ? r.json() : {}),
+        authFetch(`${API_BASE}/hospitals/${currentHospitalId}/reports/doctor-workload`).then(r => r.ok ? r.json() : []),
+        authFetch(`${API_BASE}/hospitals/${currentHospitalId}/reports/department-workload`).then(r => r.ok ? r.json() : []),
+        authFetch(`${API_BASE}/hospitals/${currentHospitalId}/appointments`).then(r => r.ok ? r.json() : [])
+    ])
+    .then(([apptsByDate, cancelStats, docWorkload, deptWorkload, allAppts]) => {
+        _cachedReportData = {
+            appointmentsByDate: apptsByDate || [],
+            cancelStats: cancelStats || {},
+            doctorWorkload: docWorkload || [],
+            departmentWorkload: deptWorkload || [],
+            allAppointments: allAppts || []
+        };
+
+        // 1. KPI Overview Cards
+        const totalBookings = cancelStats.totalBooked || allAppts.length || 0;
+        const totalCancelled = cancelStats.totalCancelled || allAppts.filter(a => a.status === 'CANCELLED').length || 0;
+        const totalCompleted = allAppts.filter(a => a.status === 'COMPLETED').length;
+        const cancelRate = cancelStats.cancellationPercentage != null ? cancelStats.cancellationPercentage.toFixed(1) : (totalBookings > 0 ? ((totalCancelled / totalBookings) * 100).toFixed(1) : '0.0');
+        const completeRate = totalBookings > 0 ? ((totalCompleted / totalBookings) * 100).toFixed(1) : '0.0';
+
+        const repTotalBookingsEl = document.getElementById('repTotalBookings');
+        if (repTotalBookingsEl) repTotalBookingsEl.textContent = totalBookings;
+
+        const repTotalCompletedEl = document.getElementById('repTotalCompleted');
+        if (repTotalCompletedEl) repTotalCompletedEl.textContent = totalCompleted;
+
+        const repCompletedPercentageEl = document.getElementById('repCompletedPercentage');
+        if (repCompletedPercentageEl) repCompletedPercentageEl.textContent = `${completeRate}%`;
+
+        const repTotalCancelledEl = document.getElementById('repTotalCancelled');
+        if (repTotalCancelledEl) repTotalCancelledEl.textContent = totalCancelled;
+
+        const repCancellationPercentageEl = document.getElementById('repCancellationPercentage');
+        if (repCancellationPercentageEl) repCancellationPercentageEl.textContent = `${cancelRate}%`;
+
+        // Calculate average doctor rating
+        let totalStars = 0, ratedCount = 0;
+        (doctorsData || []).forEach(d => {
+            if (d.averageRating && d.totalRatings > 0) {
+                totalStars += d.averageRating;
+                ratedCount++;
+            }
+        });
+        const avgHospitalRating = ratedCount > 0 ? (totalStars / ratedCount).toFixed(1) : '5.0';
+        const repHospitalRatingEl = document.getElementById('repHospitalRating');
+        if (repHospitalRatingEl) repHospitalRatingEl.innerHTML = `${avgHospitalRating} <small>★</small>`;
+
+        // 2. Table: Daily Appointments
+        const apptsTableBody = document.getElementById('reportAppointmentsByDateBody');
+        if (apptsTableBody) {
+            const nonZeroEntries = (apptsByDate || []).filter(item => item.count > 0);
+            const displayList = nonZeroEntries.length > 0 ? nonZeroEntries : (apptsByDate || []).slice(-10);
+            
+            if (displayList.length === 0) {
+                apptsTableBody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:var(--text-muted); padding:16px;">No daily trends recorded yet.</td></tr>`;
+            } else {
+                apptsTableBody.innerHTML = displayList.map(item => `
+                    <tr>
+                        <td style="font-weight:600; color:var(--text-main);">${escapeHtml(item.date)}</td>
+                        <td style="font-weight:700; color:var(--primary); font-size:0.95rem;">${item.count} bookings</td>
+                        <td><span class="badge ${item.count > 5 ? 'badge-primary' : 'badge-neutral'}">${item.count > 10 ? 'High Volume' : item.count > 0 ? 'Normal' : 'No Activity'}</span></td>
+                    </tr>
+                `).join('');
+            }
+        }
+
+        // 3. Table: Doctor Workload
+        const docWorkloadBody = document.getElementById('reportDoctorWorkloadBody');
+        if (docWorkloadBody) {
+            if (!docWorkload || docWorkload.length === 0) {
+                docWorkloadBody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:var(--text-muted); padding:16px;">No doctor workload recorded.</td></tr>`;
+            } else {
+                docWorkloadBody.innerHTML = docWorkload.map(doc => {
+                    const matchedDoc = (doctorsData || []).find(d => d.id === doc.doctorId || d.name === doc.doctorName);
+                    const rating = matchedDoc ? (matchedDoc.averageRating || 5.0).toFixed(1) : '5.0';
+                    const reviews = matchedDoc ? (matchedDoc.totalRatings || 0) : 0;
+                    return `
+                        <tr>
+                            <td style="font-weight:600; color:var(--text-main);">${escapeHtml(doc.doctorName)}</td>
+                            <td>${doc.totalAppointments || 0}</td>
+                            <td style="color:var(--success); font-weight:700;">${doc.completedAppointments || 0}</td>
+                            <td><span style="color:#FBBF24; font-weight:700;">⭐ ${rating}</span> <small style="color:var(--text-muted);">(${reviews})</small></td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+        }
+
+        // 4. Table: Department Workload
+        const deptWorkloadBody = document.getElementById('reportDepartmentWorkloadBody');
+        if (deptWorkloadBody) {
+            if (!deptWorkload || deptWorkload.length === 0) {
+                deptWorkloadBody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:var(--text-muted); padding:16px;">No department workload recorded.</td></tr>`;
+            } else {
+                deptWorkloadBody.innerHTML = deptWorkload.map(dept => {
+                    const share = totalBookings > 0 ? (((dept.totalAppointments || 0) / totalBookings) * 100).toFixed(1) : '0.0';
+                    return `
+                        <tr>
+                            <td style="font-weight:600; color:var(--text-main);">${escapeHtml(dept.departmentName)}</td>
+                            <td style="font-weight:700; color:var(--primary);">${dept.totalAppointments || 0}</td>
+                            <td><span class="badge badge-neutral">${share}%</span></td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+        }
+
+        if (window.lucide) lucide.createIcons();
+    })
+    .catch(err => {
+        console.error('Error fetching reports:', err);
+    });
+}
+
+// 📥 Export Detailed Appointments CSV
+function exportAppointmentsCSV() {
+    const appts = _cachedReportData.allAppointments || [];
+    if (appts.length === 0) {
+        alert('No appointment records available to export.');
+        return;
+    }
+
+    const headers = ['Appointment ID', 'Queue Number', 'Date', 'Time Slot', 'Patient ID', 'Patient Name', 'Doctor Name', 'Department', 'Status', 'Rating', 'Feedback Comment', 'Created At'];
+    
+    const rows = appts.map(a => [
+        `"${a.id || ''}"`,
+        `"${a.queueNumber || ''}"`,
+        `"${a.appointmentDate || ''}"`,
+        `"${a.timeSlot || ''}"`,
+        `"${a.patientId || ''}"`,
+        `"${(a.patientName || '').replace(/"/g, '""')}"`,
+        `"${(a.doctorName || '').replace(/"/g, '""')}"`,
+        `"${(a.departmentName || '').replace(/"/g, '""')}"`,
+        `"${a.status || ''}"`,
+        `"${a.rating || ''}"`,
+        `"${(a.feedbackComment || '').replace(/"/g, '""')}"`,
+        `"${a.createdAt || ''}"`
+    ]);
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `mediflow_appointments_${currentHospitalId}_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+// 📊 Export Doctor Workload CSV
+function exportDoctorWorkloadCSV() {
+    const docList = _cachedReportData.doctorWorkload || [];
+    if (docList.length === 0) {
+        alert('No doctor workload data available to export.');
+        return;
+    }
+
+    const headers = ['Doctor ID', 'Doctor Name', 'Total Appointments', 'Completed Consultations', 'Completion Rate (%)', 'Rating', 'Review Count'];
+    const rows = docList.map(doc => {
+        const matched = (doctorsData || []).find(d => d.id === doc.doctorId || d.name === doc.doctorName);
+        const rating = matched ? (matched.averageRating || 5.0).toFixed(1) : '5.0';
+        const reviews = matched ? (matched.totalRatings || 0) : 0;
+        const compRate = doc.totalAppointments > 0 ? (((doc.completedAppointments || 0) / doc.totalAppointments) * 100).toFixed(1) : '0.0';
+        return [
+            `"${doc.doctorId || ''}"`,
+            `"${(doc.doctorName || '').replace(/"/g, '""')}"`,
+            doc.totalAppointments || 0,
+            doc.completedAppointments || 0,
+            `"${compRate}%"`,
+            `"${rating}"`,
+            reviews
+        ];
+    });
+
+    const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    link.setAttribute('download', `mediflow_doctor_workload_${currentHospitalId}_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
+// 📄 Export Executive PDF Report (Print Optimized)
+function exportExecutivePDFReport() {
+    const auth = window._auth || getAuth() || {};
+    const hospitalName = auth.hospitalName || currentHospitalId;
+    const dateStr = new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+
+    const totalBookings = _cachedReportData.cancelStats.totalBooked || _cachedReportData.allAppointments.length || 0;
+    const totalCancelled = _cachedReportData.cancelStats.totalCancelled || _cachedReportData.allAppointments.filter(a => a.status === 'CANCELLED').length || 0;
+    const totalCompleted = _cachedReportData.allAppointments.filter(a => a.status === 'COMPLETED').length;
+    const cancelRate = _cachedReportData.cancelStats.cancellationPercentage != null 
+        ? _cachedReportData.cancelStats.cancellationPercentage.toFixed(1) 
+        : (totalBookings > 0 ? ((totalCancelled / totalBookings) * 100).toFixed(1) : '0.0');
+
+    let doctorRowsHtml = (_cachedReportData.doctorWorkload || []).map(d => {
+        const matched = (doctorsData || []).find(x => x.id === d.doctorId || x.name === d.doctorName);
+        const rating = matched ? (matched.averageRating || 5.0).toFixed(1) : '5.0';
+        return `
+            <tr>
+                <td style="padding:8px 12px; border-bottom:1px solid #e2e8f0; font-weight:600;">${escapeHtml(d.doctorName)}</td>
+                <td style="padding:8px 12px; border-bottom:1px solid #e2e8f0; text-align:center;">${d.totalAppointments || 0}</td>
+                <td style="padding:8px 12px; border-bottom:1px solid #e2e8f0; text-align:center; color:#10B981; font-weight:700;">${d.completedAppointments || 0}</td>
+                <td style="padding:8px 12px; border-bottom:1px solid #e2e8f0; text-align:center;">⭐ ${rating}</td>
+            </tr>
+        `;
+    }).join('');
+
+    let deptRowsHtml = (_cachedReportData.departmentWorkload || []).map(dept => `
+        <tr>
+            <td style="padding:8px 12px; border-bottom:1px solid #e2e8f0; font-weight:600;">${escapeHtml(dept.departmentName)}</td>
+            <td style="padding:8px 12px; border-bottom:1px solid #e2e8f0; text-align:center;">${dept.totalAppointments || 0}</td>
+        </tr>
+    `).join('');
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+        alert('Please allow popups to generate the Executive PDF Report.');
+        return;
+    }
+
+    printWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>MediFlow Executive Operational Report — ${hospitalName}</title>
+            <style>
+                body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; color: #1e293b; padding: 40px; margin: 0; background: #fff; }
+                .header { border-bottom: 3px solid #0284c7; padding-bottom: 20px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: flex-end; }
+                .hospital-title { font-size: 26px; font-weight: 800; color: #0f172a; margin: 0; }
+                .report-subtitle { font-size: 14px; color: #64748b; margin-top: 4px; }
+                .kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 32px; }
+                .kpi-card { background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 16px; text-align: center; }
+                .kpi-title { font-size: 12px; text-transform: uppercase; color: #64748b; font-weight: 700; margin: 0; }
+                .kpi-val { font-size: 28px; font-weight: 800; color: #0284c7; margin: 8px 0 0 0; }
+                .section-title { font-size: 18px; font-weight: 700; color: #0f172a; margin: 24px 0 12px 0; border-left: 4px solid #0284c7; padding-left: 10px; }
+                table { width: 100%; border-collapse: collapse; margin-bottom: 24px; font-size: 14px; }
+                th { background: #f1f5f9; padding: 10px 12px; text-align: left; font-weight: 700; color: #334155; border-bottom: 2px solid #cbd5e1; }
+                .footer { margin-top: 50px; border-top: 1px solid #e2e8f0; padding-top: 16px; font-size: 12px; color: #94a3b8; display: flex; justify-content: space-between; }
+                @media print {
+                    body { padding: 20px; }
+                    .no-print { display: none; }
+                }
+            </style>
+        </head>
+        <body>
+            <div class="header">
+                <div>
+                    <h1 class="hospital-title">${escapeHtml(hospitalName)}</h1>
+                    <div class="report-subtitle">MediFlow Hospital Management System &bull; Executive Operational Report</div>
+                </div>
+                <div style="text-align: right;">
+                    <div style="font-weight: 700; color: #0f172a;">Date Generated</div>
+                    <div style="font-size: 13px; color: #64748b;">${dateStr}</div>
+                </div>
+            </div>
+
+            <div class="kpi-grid">
+                <div class="kpi-card">
+                    <p class="kpi-title">Total Bookings</p>
+                    <h2 class="kpi-val">${totalBookings}</h2>
+                </div>
+                <div class="kpi-card">
+                    <p class="kpi-title">Completed Consults</p>
+                    <h2 class="kpi-val" style="color:#10B981;">${totalCompleted}</h2>
+                </div>
+                <div class="kpi-card">
+                    <p class="kpi-title">Cancelled Appts</p>
+                    <h2 class="kpi-val" style="color:#EF4444;">${totalCancelled}</h2>
+                </div>
+                <div class="kpi-card">
+                    <p class="kpi-title">Cancellation Rate</p>
+                    <h2 class="kpi-val" style="color:#8B5CF6;">${cancelRate}%</h2>
+                </div>
+            </div>
+
+            <h2 class="section-title">Doctor Workload &amp; Patient Ratings</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Doctor Name</th>
+                        <th style="text-align:center;">Total Appointments</th>
+                        <th style="text-align:center;">Completed Consultations</th>
+                        <th style="text-align:center;">Average Rating</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${doctorRowsHtml || '<tr><td colspan="4" style="text-align:center; padding:12px;">No doctor entries available.</td></tr>'}
+                </tbody>
+            </table>
+
+            <h2 class="section-title">Departmental Workload Distribution</h2>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Department</th>
+                        <th style="text-align:center;">Total Appointments</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${deptRowsHtml || '<tr><td colspan="2" style="text-align:center; padding:12px;">No department entries available.</td></tr>'}
+                </tbody>
+            </table>
+
+            <div class="footer">
+                <span>Confidential &bull; Prepared for Hospital Administration</span>
+                <span>Powered by MediFlow SaaS Multi-Tenant Platform</span>
+            </div>
+
+            <script>
+                window.onload = function() {
+                    window.print();
+                };
+            </script>
+        </body>
+        </html>
+    `);
+    printWindow.document.close();
+}
+
+
 

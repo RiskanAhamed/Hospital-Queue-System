@@ -532,25 +532,68 @@
                 <section id="tab-reports" class="tab-page">
                     <div class="page-title-row">
                         <div>
-                            <h1>Hospital Operational Reports</h1>
-                            <p>Historical trends, workload analysis, and key service metrics.</p>
+                            <h1>Hospital Operational Reports &amp; Analytics</h1>
+                            <p>Historical trends, workload analysis, and downloadable executive exports.</p>
                         </div>
-                        <button class="btn btn-secondary" onclick="fetchReports()"><i data-lucide="refresh-cw"></i> Refresh Reports</button>
+                        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                            <button class="btn btn-secondary" onclick="fetchReports()"><i data-lucide="refresh-cw"></i> Refresh</button>
+                            <button class="btn btn-secondary" onclick="exportAppointmentsCSV()"><i data-lucide="download"></i> Export Appointments (CSV)</button>
+                            <button class="btn btn-secondary" onclick="exportDoctorWorkloadCSV()"><i data-lucide="file-spreadsheet"></i> Doctor Workload (CSV)</button>
+                            <button class="btn btn-primary" onclick="exportExecutivePDFReport()"><i data-lucide="file-text"></i> Export Executive PDF</button>
+                        </div>
                     </div>
                     
+                    <!-- Quick KPI Overview Cards -->
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 20px;">
+                        <div class="metric-card glass">
+                            <div class="metric-icon blue"><i data-lucide="calendar"></i></div>
+                            <div class="metric-details">
+                                <p>Total All-Time Bookings</p>
+                                <h3 id="repTotalBookings">0</h3>
+                                <span class="trend positive"><i data-lucide="activity"></i> System Recorded</span>
+                            </div>
+                        </div>
+                        <div class="metric-card glass">
+                            <div class="metric-icon green"><i data-lucide="check-circle-2"></i></div>
+                            <div class="metric-details">
+                                <p>Completed Consultations</p>
+                                <h3 id="repTotalCompleted">0</h3>
+                                <span class="trend positive" id="repCompletedRatePill"><i data-lucide="trending-up"></i> <span id="repCompletedPercentage">0%</span> rate</span>
+                            </div>
+                        </div>
+                        <div class="metric-card glass">
+                            <div class="metric-icon" style="background:rgba(248,113,113,0.15); color:#F87171;"><i data-lucide="x-circle"></i></div>
+                            <div class="metric-details">
+                                <p>Cancelled Appointments</p>
+                                <h3 id="repTotalCancelled" style="color:#F87171;">0</h3>
+                                <span class="trend" style="color:#F87171;"><i data-lucide="alert-triangle"></i> <span id="repCancellationPercentage">0%</span> rate</span>
+                            </div>
+                        </div>
+                        <div class="metric-card glass">
+                            <div class="metric-icon purple"><i data-lucide="star"></i></div>
+                            <div class="metric-details">
+                                <p>Hospital Satisfaction</p>
+                                <h3 id="repHospitalRating">5.0 <small>★</small></h3>
+                                <span class="trend positive"><i data-lucide="thumbs-up"></i> Patient Verified</span>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Reports Grid -->
                     <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px;">
                         <!-- Report 1: Daily Appointments (Last 30 Days) -->
                         <div class="card glass">
                             <div class="card-header">
                                 <h3>Daily Appointment Trends (Last 30 Days)</h3>
+                                <button class="btn btn-sm btn-ghost" onclick="exportAppointmentsCSV()">CSV</button>
                             </div>
-                            <div class="table-responsive" style="max-height: 300px;">
+                            <div class="table-responsive" style="max-height: 320px;">
                                 <table class="custom-table">
                                     <thead>
                                         <tr>
                                             <th>Date</th>
                                             <th>Appointments Count</th>
+                                            <th>Status</th>
                                         </tr>
                                     </thead>
                                     <tbody id="reportAppointmentsByDateBody">
@@ -560,41 +603,20 @@
                             </div>
                         </div>
 
-                        <!-- Report 2: Cancellation Rates -->
-                        <div class="card glass">
-                            <div class="card-header">
-                                <h3>Appointment Cancellation Stats</h3>
-                            </div>
-                            <div style="padding: 20px; display: flex; flex-direction: column; gap: 16px;">
-                                <div style="display: flex; justify-content: space-between; font-size: 0.95rem;">
-                                    <span style="color: var(--text-muted);">Total Bookings:</span>
-                                    <strong id="repTotalBookings" style="color: var(--text-main);">0</strong>
-                                </div>
-                                <div style="display: flex; justify-content: space-between; font-size: 0.95rem;">
-                                    <span style="color: var(--text-muted);">Total Cancelled:</span>
-                                    <strong id="repTotalCancelled" style="color: #F87171;">0</strong>
-                                </div>
-                                <div style="display: flex; justify-content: space-between; font-size: 1.1rem; border-top: 1px solid var(--border-color); padding-top: 12px;">
-                                    <span style="color: var(--text-muted); font-weight: 600;">Cancellation Rate:</span>
-                                    <strong id="repCancellationPercentage" style="color: var(--primary);">0%</strong>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
                         <!-- Report 3: Doctor Workload -->
                         <div class="card glass">
                             <div class="card-header">
-                                <h3>Doctor Workload & Completion Counts</h3>
+                                <h3>Doctor Workload &amp; Patient Ratings</h3>
+                                <button class="btn btn-sm btn-ghost" onclick="exportDoctorWorkloadCSV()">CSV</button>
                             </div>
-                            <div class="table-responsive" style="max-height: 300px;">
+                            <div class="table-responsive" style="max-height: 320px;">
                                 <table class="custom-table">
                                     <thead>
                                         <tr>
                                             <th>Doctor Name</th>
-                                            <th>Total Appointments</th>
+                                            <th>Total Appts</th>
                                             <th>Completed</th>
+                                            <th>Rating</th>
                                         </tr>
                                     </thead>
                                     <tbody id="reportDoctorWorkloadBody">
@@ -603,7 +625,9 @@
                                 </table>
                             </div>
                         </div>
+                    </div>
 
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
                         <!-- Report 4: Department Workload -->
                         <div class="card glass">
                             <div class="card-header">
@@ -615,12 +639,31 @@
                                         <tr>
                                             <th>Department</th>
                                             <th>Total Appointments</th>
+                                            <th>Share %</th>
                                         </tr>
                                     </thead>
                                     <tbody id="reportDepartmentWorkloadBody">
                                         <!-- Dynamic rows -->
                                     </tbody>
                                 </table>
+                            </div>
+                        </div>
+
+                        <!-- Report Summary & Executive Actions Card -->
+                        <div class="card glass" style="display: flex; flex-direction: column; justify-content: space-between;">
+                            <div class="card-header">
+                                <h3>Executive Report Actions</h3>
+                            </div>
+                            <div style="padding: 20px; color: var(--text-muted); font-size: 0.9rem; line-height: 1.6;">
+                                <p style="margin-bottom: 12px;">Generate clean, printable PDF documents or download spreadsheet-ready CSV exports for auditing, compliance, and clinical management reviews.</p>
+                                <ul style="padding-left: 20px; margin-bottom: 20px;">
+                                    <li>Complete patient appointments &amp; cancellation breakdowns</li>
+                                    <li>Doctor throughput and verified patient star ratings</li>
+                                    <li>Departmental capacity and clinical load distribution</li>
+                                </ul>
+                                <button class="btn btn-primary btn-block" onclick="exportExecutivePDFReport()" style="padding: 12px;">
+                                    <i data-lucide="printer"></i> Print / Save Executive PDF Report
+                                </button>
                             </div>
                         </div>
                     </div>
