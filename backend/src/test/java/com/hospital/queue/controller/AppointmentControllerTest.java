@@ -93,12 +93,13 @@ public class AppointmentControllerTest {
         patientUser.setRole(com.hospital.queue.model.Role.PATIENT);
         when(userRepository.findById(patientId)).thenReturn(Optional.of(patientUser));
 
-        when(appointmentRepository.existsByPatientIdAndDoctorIdAndAppointmentDateAndStatusNot(patientId, doctorId, todayStr, "CANCELLED")).thenReturn(true);
+        String testDate = LocalDate.now().plusDays(1).toString();
+        when(appointmentRepository.existsByPatientIdAndDoctorIdAndAppointmentDateAndStatusNot(patientId, doctorId, testDate, "CANCELLED")).thenReturn(true);
 
         BookAppointmentRequest req = new BookAppointmentRequest();
         req.setDoctorId(doctorId);
         req.setPatientId(patientId);
-        req.setAppointmentDate(todayStr);
+        req.setAppointmentDate(testDate);
         req.setTimeSlot("09:30");
 
         ResponseEntity<?> response = appointmentController.bookAppointment(hospitalId, req);

@@ -25,6 +25,7 @@ import com.hospital.queue.service.AuditLogService;
 import lombok.Data;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.time.format.DateTimeParseException;
 import java.util.List;
 
@@ -136,6 +137,16 @@ public class AppointmentController {
 
         if (doctor.getAvailableSlots() != null && !doctor.getAvailableSlots().contains(req.getTimeSlot())) {
             return ResponseEntity.badRequest().body("Selected time slot is not available for this doctor.");
+        }
+
+        // Validate time slot is not in the past if booking for today
+        if ("PATIENT".equalsIgnoreCase(currentUser.getRole()) && parsedDate.equals(LocalDate.now())) {
+            try {
+                LocalTime slotTime = LocalTime.parse(req.getTimeSlot());
+                if (slotTime.isBefore(LocalTime.now().minusMinutes(5))) {
+                    return ResponseEntity.badRequest().body("Selected time slot has already passed for today. Please choose an upcoming time slot.");
+                }
+            } catch (Exception ignored) {}
         }
 
         if (appointmentRepository.existsByDoctorIdAndAppointmentDateAndTimeSlotAndStatusNot(req.getDoctorId(), req.getAppointmentDate(), req.getTimeSlot(), "CANCELLED")) {
@@ -276,6 +287,16 @@ public class AppointmentController {
 
         if (doctor.getAvailableSlots() != null && !doctor.getAvailableSlots().contains(req.getTimeSlot())) {
             return ResponseEntity.badRequest().body("Selected time slot is not available for this doctor.");
+        }
+
+        // Validate time slot is not in the past if rescheduling for today
+        if ("PATIENT".equalsIgnoreCase(currentUser.getRole()) && parsedDate.equals(LocalDate.now())) {
+            try {
+                LocalTime slotTime = LocalTime.parse(req.getTimeSlot());
+                if (slotTime.isBefore(LocalTime.now().minusMinutes(5))) {
+                    return ResponseEntity.badRequest().body("Selected time slot has already passed for today. Please choose an upcoming time slot.");
+                }
+            } catch (Exception ignored) {}
         }
 
         // Check double booking (excluding this appointment)

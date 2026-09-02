@@ -353,7 +353,8 @@ function openBookingModal(docId, name, department, room) {
     document.getElementById('modalDocName').textContent = name;
     document.getElementById('modalDocSpec').textContent = `${department} Specialist ${room ? '&bull; ' + room : ''}`;
     
-    const today = new Date().toISOString().split('T')[0];
+    const now = new Date();
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     const dateInput = document.getElementById('bookingDateInput');
     if (dateInput) {
         dateInput.min = today;
@@ -398,6 +399,11 @@ function refreshBookingSlots() {
                     .map(a => a.timeSlot)
             );
 
+            const now = new Date();
+            const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+            const isToday = selectedDate === todayStr;
+            const currentMins = now.getHours() * 60 + now.getMinutes();
+
             let firstAvailableSelected = false;
 
             let html = selectedBookingDoctorSlots.map(slot => {
@@ -407,9 +413,14 @@ function refreshBookingSlots() {
                 const displayH = h === 0 ? 12 : h > 12 ? h - 12 : h;
                 const displayStr = `${String(displayH).padStart(2, '0')}:${mm} ${period}`;
 
+                const slotMins = parseInt(hh, 10) * 60 + parseInt(mm, 10);
+                const isPast = isToday && slotMins <= currentMins;
                 const isBooked = bookedSlots.has(slot);
-                if (isBooked) {
-                    return `<button class="slot-btn booked" data-slot="${slot}" disabled title="Already booked for this date">${displayStr}</button>`;
+
+                if (isPast) {
+                    return `<button class="slot-btn booked" data-slot="${slot}" disabled title="Time has passed for today">${displayStr} (Passed)</button>`;
+                } else if (isBooked) {
+                    return `<button class="slot-btn booked" data-slot="${slot}" disabled title="Already booked for this date">${displayStr} (Booked)</button>`;
                 } else {
                     const isActive = !firstAvailableSelected;
                     if (isActive) firstAvailableSelected = true;
@@ -418,7 +429,7 @@ function refreshBookingSlots() {
             }).join('');
 
             if (!firstAvailableSelected) {
-                html += `<p style="color:#F87171; font-size:0.78rem; grid-column:1/-1; margin-top:4px;">All slots booked for this date. Please choose another date.</p>`;
+                html += `<p style="color:#F87171; font-size:0.78rem; grid-column:1/-1; margin-top:4px;">No available slots remaining for this date. Please choose another date.</p>`;
             }
 
             slotGrid.innerHTML = html;

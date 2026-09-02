@@ -1289,7 +1289,10 @@ function openNewAppointmentModal() {
 
     const dateInput = document.getElementById('apptDate');
     if (dateInput) {
-        dateInput.value = new Date().toISOString().split('T')[0];
+        const today = new Date();
+        const localDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+        dateInput.value = localDate;
+        dateInput.min = localDate;
     }
 
     updateApptTimeSlots();

@@ -37,14 +37,22 @@ export default function RescheduleScreen() {
 
   const defaultSlots = ["09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "14:00", "14:30"];
 
+  // Local date formatter (avoids UTC timezone shift bug)
+  const formatLocalDate = (d: Date) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
   useEffect(() => {
-    // Generate dates starting today
+    // Generate dates starting today in local timezone
     const list = [];
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     for (let i = 0; i < 10; i++) {
       const d = new Date();
       d.setDate(d.getDate() + i);
-      const isoString = d.toISOString().split('T')[0];
+      const isoString = formatLocalDate(d);
       list.push({
         dayName: days[d.getDay()],
         dayNum: String(d.getDate()),
@@ -214,6 +222,21 @@ export default function RescheduleScreen() {
             {availableSlots.map((slot) => {
               const isBooked = bookedSlots.has(slot);
               const isSelected = selectedSlot === slot;
+
+              // Check if slot has already passed for today
+              const isToday = selectedDate === formatLocalDate(new Date());
+              const now = new Date();
+              const [sh, sm] = slot.split(':').map(Number);
+              const isPast = isToday && (sh < now.getHours() || (sh === now.getHours() && sm <= now.getMinutes()));
+
+              if (isPast) {
+                return (
+                  <View key={slot} style={[styles.slotCell, styles.slotCellBooked]}>
+                    <Text style={styles.slotTextBooked}>{formatSlotTime(slot)}</Text>
+                    <Text style={[styles.bookedBadge, { color: '#64748B' }]}>Passed</Text>
+                  </View>
+                );
+              }
 
               if (isBooked) {
                 return (
