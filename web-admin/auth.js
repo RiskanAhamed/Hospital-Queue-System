@@ -109,7 +109,7 @@ function formatSubscriptionPlan(plan) {
     } else if (p === 'ENTERPRISE') {
         return { label: '◆ Enterprise Plan', className: 'sub-plan enterprise' };
     } else {
-        return { label: '✦ Basic Plan', className: 'sub-plan basic' };
+        return { label: '✦ Basic Plan (Free)', className: 'sub-plan basic' };
     }
 }
 

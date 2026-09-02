@@ -162,7 +162,7 @@ function updateSubscriptionTierUI(plan) {
             badgeEl.textContent = '◆ ENTERPRISE PLAN ($299/mo)';
             badgeEl.className = 'sub-plan-badge-lg enterprise';
         } else {
-            badgeEl.textContent = '✦ BASIC PLAN ($29/mo)';
+            badgeEl.textContent = '✦ BASIC PLAN (FREE / $0)';
             badgeEl.className = 'sub-plan-badge-lg basic';
         }
     }
