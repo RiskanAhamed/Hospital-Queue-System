@@ -983,10 +983,28 @@
                         <label>Contact Email</label>
                         <input type="email" id="newHospEmail" placeholder="e.g. contact@apexhealth.org">
                     </div>
+
+                    <div style="margin-top:16px; padding:12px; background:rgba(56,189,248,0.06); border:1px solid rgba(56,189,248,0.25); border-radius:8px;">
+                        <h4 style="font-size:0.88rem; color:#38BDF8; font-weight:700; margin-bottom:8px;">👨‍💼 Initial Hospital Admin Account</h4>
+                        <div class="form-group" style="margin-bottom:8px;">
+                            <label style="font-size:0.75rem;">Admin Full Name *</label>
+                            <input type="text" id="newHospAdminName" placeholder="e.g. Apex Hospital Admin" required>
+                        </div>
+                        <div style="display:flex; gap:8px;">
+                            <div class="form-group" style="flex:1; margin-bottom:0;">
+                                <label style="font-size:0.75rem;">Admin Login Email *</label>
+                                <input type="email" id="newHospAdminEmail" placeholder="admin@apexhealth.org" required>
+                            </div>
+                            <div class="form-group" style="flex:1; margin-bottom:0;">
+                                <label style="font-size:0.75rem;">Admin Password *</label>
+                                <input type="password" id="newHospAdminPassword" placeholder="admin123" required>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" onclick="closeAddHospitalModal()">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Create Hospital Tenant</button>
+                    <button type="submit" class="btn btn-primary">Create Hospital Tenant &amp; Admin</button>
                 </div>
             </form>
         </div>

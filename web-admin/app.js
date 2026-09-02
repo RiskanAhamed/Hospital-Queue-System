@@ -531,16 +531,23 @@ function submitAddHospital(event) {
     const address = document.getElementById('newHospAddress').value.trim();
     const phone = document.getElementById('newHospPhone').value.trim();
     const email = document.getElementById('newHospEmail').value.trim();
+    const adminName = document.getElementById('newHospAdminName')?.value.trim();
+    const adminEmail = document.getElementById('newHospAdminEmail')?.value.trim();
+    const adminPassword = document.getElementById('newHospAdminPassword')?.value.trim();
 
     if (!name || !code) {
         alert('Hospital Name and Code are required.');
+        return;
+    }
+    if (!adminEmail || !adminPassword) {
+        alert('Initial Hospital Admin Email and Password are required.');
         return;
     }
 
     authFetch(`${API_BASE}/hospitals`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, code, subscriptionPlan, address, phone, email })
+        body: JSON.stringify({ name, code, subscriptionPlan, address, phone, email, adminName, adminEmail, adminPassword })
     })
     .then(async r => {
         if (!r.ok) {
@@ -551,12 +558,15 @@ function submitAddHospital(event) {
     })
     .then(newHospital => {
         closeAddHospitalModal();
-        alert(`🎉 Successfully registered new hospital tenant: ${newHospital.name} (${newHospital.code})!`);
+        alert(`🎉 Successfully registered new hospital tenant: ${newHospital.name} (${newHospital.code})!\n\n👨‍💼 Initial Admin Account Created:\nEmail: ${adminEmail}\nPassword: ${adminPassword}`);
         document.getElementById('newHospName').value = '';
         document.getElementById('newHospCode').value = '';
         document.getElementById('newHospAddress').value = '';
         document.getElementById('newHospPhone').value = '';
         document.getElementById('newHospEmail').value = '';
+        if (document.getElementById('newHospAdminName')) document.getElementById('newHospAdminName').value = '';
+        if (document.getElementById('newHospAdminEmail')) document.getElementById('newHospAdminEmail').value = '';
+        if (document.getElementById('newHospAdminPassword')) document.getElementById('newHospAdminPassword').value = '';
         
         onSuperAdminHospitalChange(newHospital.id || newHospital.code);
     })

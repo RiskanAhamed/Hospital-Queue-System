@@ -87,33 +87,66 @@ public class HospitalController {
     }
 
     @PostMapping
-    public ResponseEntity<?> createHospital(@RequestBody Hospital requestData) {
+    public ResponseEntity<?> createHospital(@RequestBody java.util.Map<String, String> requestData) {
         tenantSecurityService.validateTenantAccess(null, Role.SUPER_ADMIN);
 
-        // FIX #11: Sanitize — only allow setting permitted fields from the request.
-        // Explicitly build the entity instead of persisting the raw request body,
-        // which could contain injected fields like 'id', 'active', 'createdAt'.
-        Hospital hospital = new Hospital();
-        if (requestData.getName() == null || requestData.getName().trim().isEmpty()) {
+        String name = requestData.get("name");
+        String code = requestData.get("code");
+        String address = requestData.get("address");
+        String phone = requestData.get("phone");
+        String email = requestData.get("email");
+        String queueAlgorithm = requestData.get("queueAlgorithm");
+        String subscriptionPlan = requestData.get("subscriptionPlan");
+
+        // Initial Admin Account details
+        String adminName = requestData.get("adminName");
+        String adminEmail = requestData.get("adminEmail");
+        String adminPassword = requestData.get("adminPassword");
+
+        if (name == null || name.trim().isEmpty()) {
             return ResponseEntity.badRequest().body("Hospital name is required.");
         }
-        if (requestData.getCode() == null || requestData.getCode().trim().isEmpty()) {
+        if (code == null || code.trim().isEmpty()) {
             return ResponseEntity.badRequest().body("Hospital code is required.");
         }
-        hospital.setName(requestData.getName().trim());
-        hospital.setCode(requestData.getCode().trim());
-        hospital.setAddress(requestData.getAddress() != null ? requestData.getAddress().trim() : null);
-        hospital.setPhone(requestData.getPhone() != null ? requestData.getPhone().trim() : null);
-        hospital.setEmail(requestData.getEmail() != null ? requestData.getEmail().trim() : null);
-        if (requestData.getQueueAlgorithm() != null && !requestData.getQueueAlgorithm().trim().isEmpty()) {
-            hospital.setQueueAlgorithm(requestData.getQueueAlgorithm().trim());
+
+        Hospital hospital = new Hospital();
+        hospital.setName(name.trim());
+        hospital.setCode(code.trim().toUpperCase());
+        hospital.setAddress(address != null ? address.trim() : null);
+        hospital.setPhone(phone != null ? phone.trim() : null);
+        hospital.setEmail(email != null ? email.trim() : null);
+        if (queueAlgorithm != null && !queueAlgorithm.trim().isEmpty()) {
+            hospital.setQueueAlgorithm(queueAlgorithm.trim());
         }
-        if (requestData.getSubscriptionPlan() != null && !requestData.getSubscriptionPlan().trim().isEmpty()) {
-            hospital.setSubscriptionPlan(requestData.getSubscriptionPlan().trim().toUpperCase());
+        if (subscriptionPlan != null && !subscriptionPlan.trim().isEmpty()) {
+            hospital.setSubscriptionPlan(subscriptionPlan.trim().toUpperCase());
         }
 
         try {
             Hospital saved = hospitalRepository.save(hospital);
+
+            // Auto-create initial HOSPITAL_ADMIN account if email is provided
+            if (adminEmail != null && !adminEmail.trim().isEmpty()) {
+                String safeAdminName = (adminName != null && !adminName.trim().isEmpty()) ? adminName.trim() : (saved.getName() + " Admin");
+                String safeAdminPassword = (adminPassword != null && !adminPassword.trim().isEmpty()) ? adminPassword.trim() : "admin123";
+                
+                if (userRepository.findByEmail(adminEmail.trim().toLowerCase()).isEmpty()) {
+                    User initialAdmin = new User(
+                        null,
+                        saved.getId(),
+                        safeAdminName,
+                        adminEmail.trim().toLowerCase(),
+                        passwordEncoder.encode(safeAdminPassword),
+                        saved.getPhone(),
+                        Role.HOSPITAL_ADMIN,
+                        true,
+                        java.time.LocalDateTime.now()
+                    );
+                    userRepository.save(initialAdmin);
+                }
+            }
+
             auditLogService.log(saved.getId(), tenantSecurityService.getCurrentUser().getUserId(), "HOSPITAL_CREATED", "Registered new hospital tenant: " + saved.getName() + " (" + saved.getCode() + ")");
             return ResponseEntity.ok(saved);
         } catch (org.springframework.dao.DuplicateKeyException e) {

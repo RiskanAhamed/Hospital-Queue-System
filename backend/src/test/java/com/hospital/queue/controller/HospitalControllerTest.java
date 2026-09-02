@@ -84,10 +84,11 @@ public class HospitalControllerTest {
 
     @Test
     public void testCreateHospitalClearsSuppliedId() {
-        Hospital inputHospital = new Hospital();
-        inputHospital.setId("ATTACKER_SUPPLIED_HOSPITAL_ID");
-        inputHospital.setName("New City Hospital");
-        inputHospital.setCode("NCH001");
+        java.util.Map<String, String> inputMap = new java.util.HashMap<>();
+        inputMap.put("name", "New City Hospital");
+        inputMap.put("code", "NCH001");
+        inputMap.put("adminEmail", "admin@nch.org");
+        inputMap.put("adminPassword", "admin123");
 
         when(hospitalRepository.save(any(Hospital.class))).thenAnswer(invocation -> {
             Hospital h = invocation.getArgument(0);
@@ -96,7 +97,7 @@ public class HospitalControllerTest {
             return h;
         });
 
-        ResponseEntity<?> response = hospitalController.createHospital(inputHospital);
+        ResponseEntity<?> response = hospitalController.createHospital(inputMap);
 
         assertEquals(200, response.getStatusCode().value());
         assertTrue(response.getBody() instanceof Hospital);
