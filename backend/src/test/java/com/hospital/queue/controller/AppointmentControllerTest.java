@@ -12,6 +12,7 @@ import com.hospital.queue.security.UserPrincipal;
 import com.hospital.queue.service.QueueService;
 import com.hospital.queue.service.NotificationService;
 import com.hospital.queue.service.AuditLogService;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -51,6 +52,9 @@ public class AppointmentControllerTest {
 
     @Mock
     private AuditLogService auditLogService;
+
+    @Mock
+    private SimpMessagingTemplate messagingTemplate;
 
     @InjectMocks
     private AppointmentController appointmentController;

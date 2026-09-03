@@ -22,6 +22,7 @@ import org.springframework.web.server.ResponseStatusException;
 import jakarta.validation.Valid;
 import com.hospital.queue.service.NotificationService;
 import com.hospital.queue.service.AuditLogService;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 import lombok.Data;
 
 import java.time.LocalDate;
@@ -43,6 +44,7 @@ public class AppointmentController {
     private final UserRepository userRepository;
     private final NotificationService notificationService;
     private final AuditLogService auditLogService;
+    private final SimpMessagingTemplate messagingTemplate;
 
     @Data
     public static class RescheduleRequest {
@@ -439,7 +441,12 @@ public class AppointmentController {
                     double avg = ratings.stream().mapToInt(Integer::intValue).average().orElse(5.0);
                     doc.setAverageRating(Math.round(avg * 10.0) / 10.0);
                     doc.setTotalRatings(ratings.size());
-                    doctorRepository.save(doc);
+                    Doctor savedDoc = doctorRepository.save(doc);
+                    try {
+                        messagingTemplate.convertAndSend("/topic/hospital/" + hospitalId + "/doctors", savedDoc);
+                    } catch (Exception e) {
+                        // Log and ignore failure in websocket broadcast
+                    }
                 }
             }
         }

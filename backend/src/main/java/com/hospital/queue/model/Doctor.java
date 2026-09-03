@@ -41,5 +41,8 @@ public class Doctor {
         this.maxDailyAppointments = maxDailyAppointments;
         this.available = available;
         this.availableSlots = availableSlots;
+        this.averageRating = 5.0;
+        this.totalRatings = 0;
+        this.status = "ACTIVE";
     }
 }
