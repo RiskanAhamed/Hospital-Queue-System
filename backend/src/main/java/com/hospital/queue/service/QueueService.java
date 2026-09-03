@@ -36,6 +36,8 @@ public class QueueService {
     private final com.hospital.queue.repository.UserRepository userRepository;
     private final SimpMessagingTemplate messagingTemplate;
     private final NotificationService notificationService;
+    private final EmailService emailService;
+    private final com.hospital.queue.repository.HospitalRepository hospitalRepository;
     private final MongoTemplate mongoTemplate;
 
     private String getPatientLanguage(String patientId) {
@@ -148,6 +150,7 @@ public class QueueService {
                     appointmentRepository.save(appt);
                 });
             }
+            sendRatingAndCompletionAlerts(q);
         });
 
         // Find next waiting patient
@@ -272,10 +275,50 @@ public class QueueService {
                 });
             }
 
+            sendRatingAndCompletionAlerts(saved);
+
             broadcastQueueState(saved.getHospitalId(), saved.getDoctorId());
             return saved;
         }
         return null;
+    }
+
+    private void sendRatingAndCompletionAlerts(QueueEntry queueEntry) {
+        if (queueEntry == null || queueEntry.getPatientId() == null) return;
+        try {
+            String hospitalId = queueEntry.getHospitalId();
+            String patientId = queueEntry.getPatientId();
+            String lang = getPatientLanguage(patientId);
+
+            final String doctorName = queueEntry.getDoctorId() != null
+                    ? doctorRepository.findById(queueEntry.getDoctorId()).map(Doctor::getName).orElse("your doctor")
+                    : "your doctor";
+
+            String title = "en".equalsIgnoreCase(lang) ? "Consultation Completed - Rate Your Doctor" : "சிகிச்சை முடிந்தது - உங்கள் மருத்துவரை மதிப்பிடுங்கள்";
+            String msg = "en".equalsIgnoreCase(lang) 
+                    ? "Your consultation with Dr. " + doctorName + " is complete. Please rate your experience (1-5 stars)."
+                    : "Dr. " + doctorName + "-உடனான சிகிச்சை முடிந்தது. உங்கள் அனுபவத்திற்கு 1-5 நட்சத்திர மதிப்பீடு வழங்கவும்.";
+
+            notificationService.createAndSendNotification(hospitalId, patientId, "RATE_DOCTOR", title, msg);
+
+            // Send Gmail / Email notification if patient has an email address
+            userRepository.findById(patientId).ifPresent(patientUser -> {
+                if (patientUser.getEmail() != null && !patientUser.getEmail().trim().isEmpty()) {
+                    String hospitalName = hospitalRepository.findById(hospitalId)
+                            .map(com.hospital.queue.model.Hospital::getName)
+                            .orElse("MediFlow Hospital");
+                    emailService.sendConsultationRatingEmail(
+                            patientUser.getEmail(),
+                            patientUser.getName(),
+                            doctorName,
+                            hospitalName,
+                            queueEntry.getAppointmentId()
+                    );
+                }
+            });
+        } catch (Exception e) {
+            log.warn("Failed to dispatch consultation completion alerts: {}", e.getMessage());
+        }
     }
 
     public QueueEntry skipPatient(String hospitalId, String queueId) {

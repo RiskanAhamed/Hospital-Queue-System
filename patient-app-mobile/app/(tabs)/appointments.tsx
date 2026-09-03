@@ -21,6 +21,7 @@ import { useLanguage } from '../../context/LanguageContext';
 
 interface Appointment {
   id: string;
+  hospitalId?: string;
   patientId: string;
   doctorId: string;
   doctorName: string;
@@ -147,11 +148,12 @@ export default function AppointmentsScreen() {
   };
 
   const submitRating = async () => {
-    if (!hospitalId || !selectedApptForRating) return;
+    const targetHospId = selectedApptForRating?.hospitalId || hospitalId;
+    if (!targetHospId || !selectedApptForRating) return;
 
     setSubmittingRating(true);
     try {
-      const res = await authFetch(`/hospitals/${hospitalId}/appointments/${selectedApptForRating.id}/rating`, {
+      const res = await authFetch(`/hospitals/${targetHospId}/appointments/${selectedApptForRating.id}/rating`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

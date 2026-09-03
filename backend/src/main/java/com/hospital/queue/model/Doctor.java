@@ -27,6 +27,7 @@ public class Doctor {
     private List<String> availableSlots; // e.g. ["09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "14:00", "14:30"]
     private Double averageRating = 5.0;
     private Integer totalRatings = 0;
+    private String status = "ACTIVE";
 
     public Doctor(String id, String hospitalId, String userId, String name, String departmentId, String departmentName, String specialization, String roomNumber, int maxDailyAppointments, boolean available, List<String> availableSlots) {
         this.id = id;

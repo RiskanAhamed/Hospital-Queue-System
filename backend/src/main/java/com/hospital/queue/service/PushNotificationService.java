@@ -24,7 +24,8 @@ public class PushNotificationService {
      */
     @Async
     public void sendExpoPushNotification(String expoPushToken, String title, String body, Map<String, Object> data) {
-        if (expoPushToken == null || !expoPushToken.trim().startsWith("ExponentPushToken[")) {
+        if (expoPushToken == null || expoPushToken.trim().isEmpty() 
+                || (!expoPushToken.trim().startsWith("ExponentPushToken[") && !expoPushToken.trim().startsWith("ExpoPushToken["))) {
             log.debug("Skipping push notification: invalid or missing Expo push token '{}'", expoPushToken);
             return;
         }

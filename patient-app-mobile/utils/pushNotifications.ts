@@ -29,6 +29,9 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
         importance: Notifications.AndroidImportance.MAX,
         vibrationPattern: [0, 250, 250, 250],
         lightColor: '#38BDF8',
+        lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+        enableLights: true,
+        enableVibrate: true,
         sound: 'default',
       });
     }
@@ -45,11 +48,22 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
         return null;
       }
 
-      const projectId = Constants?.expoConfig?.extra?.eas?.projectId ?? Constants?.easConfig?.projectId;
-      const pushTokenData = await Notifications.getExpoPushTokenAsync(
-        projectId ? { projectId } : undefined
-      );
-      token = pushTokenData.data;
+      const projectId =
+        Constants?.expoConfig?.extra?.eas?.projectId ??
+        Constants?.easConfig?.projectId ??
+        'cfb8f72c-43d2-4592-a487-85a596553c87';
+
+      try {
+        const pushTokenData = await Notifications.getExpoPushTokenAsync({
+          projectId: projectId || undefined,
+        });
+        token = pushTokenData.data;
+      } catch (tokenErr) {
+        console.warn('First push token attempt failed, attempting default token retrieval:', tokenErr);
+        const pushTokenData = await Notifications.getExpoPushTokenAsync();
+        token = pushTokenData.data;
+      }
+
       console.log('Expo Push Token obtained:', token);
 
       // Send push token to backend for authenticated user
