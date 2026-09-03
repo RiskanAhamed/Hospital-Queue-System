@@ -70,6 +70,14 @@ public class DoctorController {
 
         doctor.setId(null);
         doctor.setHospitalId(hospitalId);
+        if (doctor.getStatus() == null || doctor.getStatus().trim().isEmpty()) {
+            doctor.setStatus("ACTIVE");
+        }
+        if (doctor.getAverageRating() == 0.0 && doctor.getTotalRatings() == 0) {
+            doctor.setAverageRating(5.0);
+            doctor.setTotalRatings(0);
+        }
+        doctor.setAvailable(true);
         if (doctor.getAvailableSlots() == null || doctor.getAvailableSlots().isEmpty()) {
             doctor.setAvailableSlots(Arrays.asList("09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "14:00", "14:30", "15:00"));
         }
@@ -81,6 +89,23 @@ public class DoctorController {
             log.error("Failed to broadcast doctor creation to STOMP topic: {}", e.getMessage(), e);
         }
         return ResponseEntity.ok(saved);
+    }
+
+    @DeleteMapping("/{doctorId}")
+    public ResponseEntity<?> deleteDoctor(@PathVariable String hospitalId, @PathVariable String doctorId) {
+        tenantSecurityService.validateTenantAccess(hospitalId, Role.HOSPITAL_ADMIN);
+        Doctor doc = doctorRepository.findById(doctorId).orElse(null);
+        if (doc == null || !doc.getHospitalId().equals(hospitalId)) {
+            return ResponseEntity.notFound().build();
+        }
+        doctorRepository.delete(doc);
+        auditLogService.log(hospitalId, tenantSecurityService.getCurrentUser().getUserId(), "DOCTOR_DELETED", "Deleted Doctor: " + doc.getName() + " (ID: " + doc.getId() + ")");
+        try {
+            messagingTemplate.convertAndSend("/topic/hospital/" + hospitalId + "/doctors/delete", java.util.Map.of("id", doctorId));
+        } catch (Exception e) {
+            log.error("Failed to broadcast doctor deletion: {}", e.getMessage(), e);
+        }
+        return ResponseEntity.ok(java.util.Map.of("message", "Doctor deleted successfully"));
     }
 
     @PutMapping("/{doctorId}/availability")
