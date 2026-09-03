@@ -14,7 +14,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { disconnectWebSocket } from '../../utils/websocket';
-import { authFetch } from '../../utils/api';
+import { authFetch, getErrorMessage } from '../../utils/api';
 
 import { useLanguage } from '../../context/LanguageContext';
 
@@ -67,8 +67,8 @@ export default function ProfileScreen() {
         setNewPassword('');
         setConfirmPassword('');
       } else {
-        const text = await res.text();
-        setPwdError(text || 'Failed to change password. Please check your current password.');
+        const errorMsg = await getErrorMessage(res, 'Failed to change password. Please check your current password.');
+        setPwdError(errorMsg);
       }
     } catch (e: any) {
       setPwdError(e.message || 'Connection error. Please try again.');
