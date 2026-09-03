@@ -45,7 +45,7 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request) {
-        String email = request.getEmail().toLowerCase();
+        String email = request.getEmail() != null ? request.getEmail().trim().toLowerCase() : "";
 
         // BUG 31 FIX (v2): Check brute-force rate limit from MongoDB
         LocalDateTime cutoff = LocalDateTime.now().minusMinutes(WINDOW_MINUTES);
@@ -122,7 +122,8 @@ public class AuthController {
 
     @PostMapping("/register")
     public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest request) {
-        if (userRepository.findByEmail(request.getEmail()).isPresent()) {
+        String normalizedEmail = request.getEmail() != null ? request.getEmail().trim().toLowerCase() : "";
+        if (userRepository.findByEmail(normalizedEmail).isPresent()) {
             return ResponseEntity.badRequest().body("Email is already registered.");
         }
 
@@ -137,8 +138,8 @@ public class AuthController {
         }
 
         User user = new User();
-        user.setName(request.getName());
-        user.setEmail(request.getEmail());
+        user.setName(request.getName() != null ? request.getName().trim() : "Patient");
+        user.setEmail(normalizedEmail);
         user.setPassword(passwordEncoder.encode(request.getPassword()));
         user.setPhone(request.getPhone());
         // Public registration ONLY allows Role.PATIENT (prevents self-assignment of ADMIN/STAFF roles)
@@ -203,7 +204,7 @@ public class AuthController {
 
     @PostMapping("/forgot-password")
     public ResponseEntity<?> forgotPassword(@Valid @RequestBody ForgotPasswordRequest req) {
-        String email = req.getEmail().toLowerCase();
+        String email = req.getEmail() != null ? req.getEmail().trim().toLowerCase() : "";
         Optional<User> userOpt = userRepository.findByEmail(email);
 
         String genericMessage = "If an account with that email exists, a password reset verification code has been dispatched.";
