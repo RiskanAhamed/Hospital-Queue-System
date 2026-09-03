@@ -11,3 +11,10 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Mobile build artifacts
+*.apk
+*.aab
+
+# Node dependencies
+node_modules/

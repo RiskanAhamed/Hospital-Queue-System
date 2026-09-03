@@ -28,7 +28,9 @@ function AppContent() {
   useEffect(() => {
     if (token) {
       // Register device for background push notifications
-      registerForPushNotificationsAsync();
+      registerForPushNotificationsAsync().catch((e) =>
+        console.error('Push notification setup failed:', e)
+      );
 
       // Listen for notification taps
       const subscription = Notifications.addNotificationResponseReceivedListener(response => {
