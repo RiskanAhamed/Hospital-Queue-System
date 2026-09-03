@@ -48,6 +48,13 @@ export default function QueueScreen() {
   const [bannerText, setBannerText] = useState('Book an appointment to track live status');
   const [bannerStyle, setBannerStyle] = useState('info'); // info, waiting, called, completed
 
+  const formatLocalDate = (d: Date) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
+
   const fetchActiveAppointmentAndQueue = useCallback(async () => {
     if (!hospitalId || !user?.userId) return;
 
@@ -55,7 +62,7 @@ export default function QueueScreen() {
       const res = await authFetch(`/hospitals/${hospitalId}/appointments?patientId=${user.userId}`);
       if (res.ok) {
         const appts: Appointment[] = await res.json();
-        const todayStr = new Date().toISOString().split('T')[0];
+        const todayStr = formatLocalDate(new Date());
         const active = (appts || [])
           .filter(
             (a) =>
