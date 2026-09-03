@@ -48,7 +48,8 @@ function AppContent() {
             if (
               data.type === 'RATE_DOCTOR' ||
               data.type === 'APPOINTMENT_CONFIRMED' ||
-              data.type === 'APPOINTMENT_CANCELLED'
+              data.type === 'APPOINTMENT_CANCELLED' ||
+              data.type === 'APPOINTMENT_REMINDER'
             ) {
               router.push('/(tabs)/appointments');
             } else if (
