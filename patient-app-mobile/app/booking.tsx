@@ -36,6 +36,7 @@ export default function BookingScreen() {
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [bookingLoading, setBookingLoading] = useState(false);
+  const [doctorAvailable, setDoctorAvailable] = useState(true);
 
   // Default slots fallback
   const defaultSlots = ["09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "14:00", "14:30"];
@@ -82,8 +83,15 @@ export default function BookingScreen() {
         if (docRes.ok) {
           const docs = await docRes.json();
           const doc = docs.find((d: any) => d.id === doctorId);
-          if (doc && doc.availableSlots && doc.availableSlots.length > 0) {
-            doctorSlots = doc.availableSlots;
+          if (doc) {
+            if (doc.available === false || doc.status === 'UNAVAILABLE' || doc.status === 'ON_LEAVE') {
+              setDoctorAvailable(false);
+            } else {
+              setDoctorAvailable(true);
+            }
+            if (doc.availableSlots && doc.availableSlots.length > 0) {
+              doctorSlots = doc.availableSlots;
+            }
           }
         }
         setAvailableSlots(doctorSlots);
@@ -214,7 +222,27 @@ export default function BookingScreen() {
 
         {/* Slots Grid */}
         <Text style={styles.sectionHeading}>Available Slots</Text>
-        {loadingSlots ? (
+        {!doctorAvailable ? (
+          <View
+            style={{
+              backgroundColor: 'rgba(248, 113, 113, 0.12)',
+              borderColor: 'rgba(248, 113, 113, 0.3)',
+              borderWidth: 1,
+              borderRadius: 12,
+              padding: 16,
+              alignItems: 'center',
+              marginTop: 10,
+            }}
+          >
+            <Ionicons name="alert-circle-outline" size={32} color="#F87171" style={{ marginBottom: 6 }} />
+            <Text style={{ color: '#F87171', fontWeight: '700', fontSize: 14, textAlign: 'center' }}>
+              Doctor Currently Unavailable
+            </Text>
+            <Text style={{ color: '#94A3B8', fontSize: 12, textAlign: 'center', marginTop: 4 }}>
+              Dr. {doctorName || 'Doctor'} is currently away or not accepting bookings. Please choose another doctor.
+            </Text>
+          </View>
+        ) : loadingSlots ? (
           <View style={styles.centeredBlock}>
             <ActivityIndicator size="large" color="#38BDF8" />
             <Text style={styles.loadingText}>Fetching available times...</Text>
@@ -271,9 +299,9 @@ export default function BookingScreen() {
       {/* Footer Booking button */}
       <View style={styles.footer}>
         <TouchableOpacity
-          style={[styles.btnConfirm, (!selectedSlot || bookingLoading) && styles.btnConfirmDisabled]}
+          style={[styles.btnConfirm, (!selectedSlot || bookingLoading || !doctorAvailable) && styles.btnConfirmDisabled]}
           onPress={handleBookingConfirm}
-          disabled={!selectedSlot || bookingLoading}
+          disabled={!selectedSlot || bookingLoading || !doctorAvailable}
         >
           {bookingLoading ? (
             <ActivityIndicator color="#090D16" />

@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
-import { authFetch, API_BASE } from '../../utils/api';
+import { authFetch, API_BASE, getErrorMessage } from '../../utils/api';
 import {
   connectWebSocket,
   subscribeToQueue,
@@ -335,8 +335,8 @@ export default function HomeScreen() {
                 Alert.alert('Cancelled', 'Your appointment has been cancelled successfully.');
                 loadData();
               } else {
-                const text = await res.text();
-                Alert.alert('Error', text || 'Could not cancel appointment.');
+                const errorMsg = await getErrorMessage(res, 'Could not cancel appointment.');
+                Alert.alert('Error', errorMsg);
               }
             } catch (e) {
               Alert.alert('Error', 'Connection error.');
@@ -347,10 +347,12 @@ export default function HomeScreen() {
     );
   };
 
-  // Filtered doctors
+  // Filtered doctors with null safety and specialization support
   const filteredDoctors = doctors.filter((doc) => {
-    const matchesSearch = doc.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      doc.departmentName.toLowerCase().includes(searchQuery.toLowerCase());
+    const q = (searchQuery || '').trim().toLowerCase();
+    const docName = (doc.name || '').toLowerCase();
+    const deptName = (doc.departmentName || '').toLowerCase();
+    const matchesSearch = !q || docName.includes(q) || deptName.includes(q);
     const matchesDept = selectedDeptId ? doc.departmentId === selectedDeptId : true;
     return matchesSearch && matchesDept;
   });

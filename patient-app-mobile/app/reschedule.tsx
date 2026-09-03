@@ -36,6 +36,7 @@ export default function RescheduleScreen() {
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [rescheduleLoading, setRescheduleLoading] = useState(false);
+  const [doctorAvailable, setDoctorAvailable] = useState(true);
 
   const defaultSlots = ["09:00", "09:30", "10:00", "10:30", "11:00", "11:30", "14:00", "14:30"];
 
@@ -81,8 +82,15 @@ export default function RescheduleScreen() {
         if (docRes.ok) {
           const docs = await docRes.json();
           const doc = docs.find((d: any) => d.id === doctorId);
-          if (doc && doc.availableSlots && doc.availableSlots.length > 0) {
-            doctorSlots = doc.availableSlots;
+          if (doc) {
+            if (doc.available === false || doc.status === 'UNAVAILABLE' || doc.status === 'ON_LEAVE') {
+              setDoctorAvailable(false);
+            } else {
+              setDoctorAvailable(true);
+            }
+            if (doc.availableSlots && doc.availableSlots.length > 0) {
+              doctorSlots = doc.availableSlots;
+            }
           }
         }
         setAvailableSlots(doctorSlots);
@@ -214,7 +222,27 @@ export default function RescheduleScreen() {
 
         {/* Slots Grid */}
         <Text style={styles.sectionHeading}>Select New Slot</Text>
-        {loadingSlots ? (
+        {!doctorAvailable ? (
+          <View
+            style={{
+              backgroundColor: 'rgba(248, 113, 113, 0.12)',
+              borderColor: 'rgba(248, 113, 113, 0.3)',
+              borderWidth: 1,
+              borderRadius: 12,
+              padding: 16,
+              alignItems: 'center',
+              marginTop: 10,
+            }}
+          >
+            <Ionicons name="alert-circle-outline" size={32} color="#F87171" style={{ marginBottom: 6 }} />
+            <Text style={{ color: '#F87171', fontWeight: '700', fontSize: 14, textAlign: 'center' }}>
+              Doctor Currently Unavailable
+            </Text>
+            <Text style={{ color: '#94A3B8', fontSize: 12, textAlign: 'center', marginTop: 4 }}>
+              Dr. {doctorName || 'Doctor'} is currently away or not accepting bookings. Please choose another date or doctor.
+            </Text>
+          </View>
+        ) : loadingSlots ? (
           <View style={styles.centeredBlock}>
             <ActivityIndicator size="large" color="#38BDF8" />
             <Text style={styles.loadingText}>Fetching available times...</Text>
@@ -271,9 +299,9 @@ export default function RescheduleScreen() {
       {/* Footer Booking button */}
       <View style={styles.footer}>
         <TouchableOpacity
-          style={[styles.btnConfirm, (!selectedSlot || rescheduleLoading) && styles.btnConfirmDisabled]}
+          style={[styles.btnConfirm, (!selectedSlot || rescheduleLoading || !doctorAvailable) && styles.btnConfirmDisabled]}
           onPress={handleRescheduleConfirm}
-          disabled={!selectedSlot || rescheduleLoading}
+          disabled={!selectedSlot || rescheduleLoading || !doctorAvailable}
         >
           {rescheduleLoading ? (
             <ActivityIndicator color="#090D16" />
