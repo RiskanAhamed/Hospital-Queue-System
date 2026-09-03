@@ -78,8 +78,13 @@ function authFetch(url, options = {}) {
  * Get initials from a full name (e.g. "Sarah Staff" → "SS")
  */
 function getInitials(name) {
-    if (!name) return '??';
-    return name.split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2);
+    if (!name || !name.trim()) return 'U';
+    const parts = name.trim().split(/\s+/).filter(Boolean);
+    if (parts.length === 0) return 'U';
+    if (parts.length === 1) {
+        return parts[0].substring(0, 2).toUpperCase();
+    }
+    return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
 /**
