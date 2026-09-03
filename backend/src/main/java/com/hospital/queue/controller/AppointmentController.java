@@ -205,10 +205,17 @@ public class AppointmentController {
         // Fetch latest saved to get the generated queue number
         saved = appointmentRepository.findById(saved.getId()).orElse(saved);
 
-        // Notify patient: "Appointment Confirmed" with queue number
+        // Notify patient: "Appointment Confirmed" with queue number in preferred language
+        String lang = "ta";
+        if (saved.getPatientId() != null) {
+            lang = userRepository.findById(saved.getPatientId()).map(User::getPreferredLanguage).orElse("ta");
+        }
         String qNumber = saved.getQueueNumber();
-        String notificationMsg = "Your appointment with " + saved.getDoctorName() + " has been booked successfully for " + saved.getAppointmentDate() + " at " + saved.getTimeSlot() + "." + (qNumber != null ? " Your queue token is: " + qNumber + "." : "");
-        notificationService.createAndSendNotification(hospitalId, saved.getPatientId(), "APPOINTMENT_CONFIRMED", "Appointment Confirmed", notificationMsg);
+        String notifTitle = "en".equalsIgnoreCase(lang) ? "Appointment Confirmed" : "சந்திப்பு உறுதிசெய்யப்பட்டது";
+        String notificationMsg = "en".equalsIgnoreCase(lang)
+                ? "Your appointment with " + saved.getDoctorName() + " has been booked for " + saved.getAppointmentDate() + " at " + saved.getTimeSlot() + "." + (qNumber != null ? " Your queue token is: " + qNumber + "." : "")
+                : "Dr. " + saved.getDoctorName() + "-உடன் உங்கள் சந்திப்பு " + saved.getAppointmentDate() + " " + saved.getTimeSlot() + "-க்கு உறுதிசெய்யப்பட்டது." + (qNumber != null ? " உங்கள் டோக்கன் எண்: " + qNumber + "." : "");
+        notificationService.createAndSendNotification(hospitalId, saved.getPatientId(), "APPOINTMENT_CONFIRMED", notifTitle, notificationMsg);
 
         // Audit Log
         auditLogService.log(hospitalId, currentUser.getUserId(), "APPOINTMENT_BOOKED", "Appointment booked for patient " + saved.getPatientName() + " (ID: " + saved.getPatientId() + ") with doctor " + saved.getDoctorName() + " (ID: " + saved.getDoctorId() + ")");
@@ -250,9 +257,16 @@ public class AppointmentController {
             queueService.broadcastQueueState(hospitalId, queueEntry.getDoctorId());
         });
 
-        // Notify patient: "Appointment Cancelled"
-        String notificationMsg = "Your appointment with " + saved.getDoctorName() + " on " + saved.getAppointmentDate() + " has been cancelled.";
-        notificationService.createAndSendNotification(hospitalId, saved.getPatientId(), "APPOINTMENT_CANCELLED", "Appointment Cancelled", notificationMsg);
+        // Notify patient: "Appointment Cancelled" in preferred language
+        String cancelLang = "ta";
+        if (saved.getPatientId() != null) {
+            cancelLang = userRepository.findById(saved.getPatientId()).map(User::getPreferredLanguage).orElse("ta");
+        }
+        String cancelTitle = "en".equalsIgnoreCase(cancelLang) ? "Appointment Cancelled" : "சந்திப்பு ரத்து செய்யப்பட்டது";
+        String notificationMsg = "en".equalsIgnoreCase(cancelLang)
+                ? "Your appointment with " + saved.getDoctorName() + " on " + saved.getAppointmentDate() + " has been cancelled."
+                : "Dr. " + saved.getDoctorName() + "-உடன் " + saved.getAppointmentDate() + "-ல் இருந்த உங்கள் சந்திப்பு ரத்து செய்யப்பட்டது.";
+        notificationService.createAndSendNotification(hospitalId, saved.getPatientId(), "APPOINTMENT_CANCELLED", cancelTitle, notificationMsg);
 
         // Audit Log
         auditLogService.log(hospitalId, currentUser.getUserId(), "APPOINTMENT_CANCELLED", "Appointment cancelled (ID: " + saved.getId() + ")");
@@ -367,10 +381,17 @@ public class AppointmentController {
         // Fetch latest saved to get the generated queue number
         saved = appointmentRepository.findById(saved.getId()).orElse(saved);
 
-        // Notify patient: "Appointment Rescheduled"
+        // Notify patient: "Appointment Rescheduled" in preferred language
+        String reschedLang = "ta";
+        if (saved.getPatientId() != null) {
+            reschedLang = userRepository.findById(saved.getPatientId()).map(User::getPreferredLanguage).orElse("ta");
+        }
         String qNumber = saved.getQueueNumber();
-        String notificationMsg = "Your appointment with " + saved.getDoctorName() + " has been rescheduled to " + saved.getAppointmentDate() + " at " + saved.getTimeSlot() + "." + (qNumber != null ? " Your new queue token is: " + qNumber + "." : "");
-        notificationService.createAndSendNotification(hospitalId, saved.getPatientId(), "APPOINTMENT_CONFIRMED", "Appointment Rescheduled", notificationMsg);
+        String reschedTitle = "en".equalsIgnoreCase(reschedLang) ? "Appointment Rescheduled" : "சந்திப்பு நேரம் மாற்றப்பட்டது";
+        String notificationMsg = "en".equalsIgnoreCase(reschedLang)
+                ? "Your appointment with Dr. " + saved.getDoctorName() + " has been rescheduled to " + saved.getAppointmentDate() + " at " + saved.getTimeSlot() + "." + (qNumber != null ? " Your new queue token is: " + qNumber + "." : "")
+                : "Dr. " + saved.getDoctorName() + "-உடன் உங்கள் சந்திப்பு " + saved.getAppointmentDate() + " " + saved.getTimeSlot() + "-க்கு மாற்றப்பட்டது." + (qNumber != null ? " உங்கள் புதிய டோக்கன் எண்: " + qNumber + "." : "");
+        notificationService.createAndSendNotification(hospitalId, saved.getPatientId(), "APPOINTMENT_CONFIRMED", reschedTitle, notificationMsg);
 
         // Audit Log
         auditLogService.log(hospitalId, currentUser.getUserId(), "APPOINTMENT_RESCHEDULED", "Rescheduled appointment (ID: " + saved.getId() + ") for patient " + saved.getPatientName() + " to " + saved.getAppointmentDate() + " at " + saved.getTimeSlot());
