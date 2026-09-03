@@ -116,14 +116,25 @@ export default function HomeScreen() {
       const apptRes = await authFetch(`/hospitals/${hospitalId}/appointments?patientId=${user.userId}`);
       if (apptRes.ok) {
         const appts: Appointment[] = await apptRes.json();
-        const activeList = (appts || []).filter(
-          (a) =>
-            a.status === 'BOOKED' ||
-            a.status === 'CHECKED_IN' ||
-            a.status === 'WAITING' ||
-            a.status === 'CALLED' ||
-            a.status === 'IN_CONSULTATION'
-        );
+        const todayStr = new Date().toISOString().split('T')[0];
+        const activeList = (appts || [])
+          .filter(
+            (a) =>
+              (a.status === 'BOOKED' ||
+                a.status === 'CHECKED_IN' ||
+                a.status === 'WAITING' ||
+                a.status === 'CALLED' ||
+                a.status === 'IN_CONSULTATION') &&
+              a.appointmentDate >= todayStr
+          )
+          .sort((a, b) => {
+            if (a.appointmentDate === todayStr && b.appointmentDate !== todayStr) return -1;
+            if (b.appointmentDate === todayStr && a.appointmentDate !== todayStr) return 1;
+            return (
+              a.appointmentDate.localeCompare(b.appointmentDate) ||
+              (a.timeSlot || '').localeCompare(b.timeSlot || '')
+            );
+          });
         setAllActiveAppointments(activeList);
 
         // Keep current selected if still active, otherwise pick first
@@ -185,12 +196,24 @@ export default function HomeScreen() {
     setCurrentlyServing(serving);
 
     if (!activeAppointment) return;
-    const myToken = activeAppointment.queueNumber;
-    const entries = summary.entries || [];
-    const myEntry = entries.find((e: any) => e.queueNumber === myToken || e.id === activeAppointment.id);
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const isToday = activeAppointment.appointmentDate === todayStr;
 
     const doc = doctors.find((d) => d.id === (summary.doctorId || activeAppointment.doctorId));
     const roomName = doc?.roomNumber ? `Room ${doc.roomNumber}` : 'Doctor Room';
+
+    if (!isToday) {
+      setPeopleAhead('--');
+      setEstWaitTime('--');
+      setQueueBannerStyle('info');
+      setQueueBannerText(`📅 Scheduled for ${activeAppointment.appointmentDate} at ${activeAppointment.timeSlot || ''}`);
+      return;
+    }
+
+    const myToken = activeAppointment.queueNumber;
+    const entries = summary.entries || [];
+    const myEntry = entries.find((e: any) => (myToken && e.queueNumber === myToken) || e.appointmentId === activeAppointment.id || e.id === activeAppointment.id);
 
     if (serving === myToken || (myEntry && (myEntry.status === 'CALLED' || myEntry.status === 'IN_CONSULTATION'))) {
       setPeopleAhead(0);
@@ -202,10 +225,10 @@ export default function HomeScreen() {
       setEstWaitTime('Done');
       setQueueBannerStyle('completed');
       setQueueBannerText('Consultation Completed. Thank you!');
-    } else {
+    } else if (myEntry && myEntry.status === 'WAITING') {
       const waitingEntries = entries.filter((e: any) => e.status === 'WAITING');
-      const myIndex = waitingEntries.findIndex((e: any) => e.queueNumber === myToken);
-      const aheadCount = myIndex >= 0 ? myIndex : waitingEntries.length;
+      const myIndex = waitingEntries.findIndex((e: any) => (myToken && e.queueNumber === myToken) || e.appointmentId === activeAppointment.id || e.id === activeAppointment.id);
+      const aheadCount = myIndex >= 0 ? myIndex : 0;
       const waitStr = aheadCount === 0 ? 'Next up!' : `${aheadCount * 10} mins`;
 
       let bannerMsg = `Waiting in queue (${aheadCount} patient${aheadCount !== 1 ? 's' : ''} ahead)`;
@@ -221,6 +244,11 @@ export default function HomeScreen() {
       setEstWaitTime(waitStr);
       setQueueBannerStyle('waiting');
       setQueueBannerText(bannerMsg);
+    } else {
+      setPeopleAhead(summary.waitingCount ?? '--');
+      setEstWaitTime(summary.waitingCount ? `${summary.waitingCount * 10} mins` : '--');
+      setQueueBannerStyle('info');
+      setQueueBannerText(`📅 Today at ${activeAppointment.timeSlot || ''} (Token ${activeAppointment.queueNumber || '--'})`);
     }
   }, [activeAppointment, doctors]);
 

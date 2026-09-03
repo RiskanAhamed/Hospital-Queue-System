@@ -655,12 +655,28 @@ function updateLiveQueueTicket(summary) {
         return;
     }
 
-    const myToken = myActiveAppointment.queueNumber;
-    const entries = summary.entries || [];
-    const myEntry = entries.find(e => e.queueNumber === myToken || e.id === myActiveAppointment.id);
+    const todayStr = new Date().toISOString().split('T')[0];
+    const isToday = myActiveAppointment.appointmentDate === todayStr;
 
     const doc = doctorsData.find(d => d.id === (summary.doctorId || currentDoctorId));
     const roomName = doc ? (doc.roomNumber || 'Doctor Room') : 'Doctor Room';
+
+    if (!isToday) {
+        const scheduledText = `📅 Scheduled for ${myActiveAppointment.appointmentDate} at ${myActiveAppointment.timeSlot || ''}`;
+        document.getElementById('peopleAheadCount').textContent = '--';
+        document.getElementById('estWaitTime').textContent = '--';
+        document.getElementById('queueStatusBanner').className = 'queue-status-banner status-waiting';
+        document.getElementById('queueStatusText').textContent = scheduledText;
+        const qa = document.getElementById('queueTabAhead'); if (qa) qa.textContent = '--';
+        const qw = document.getElementById('queueTabWait'); if (qw) qw.textContent = '--';
+        const qb = document.getElementById('queueTabStatusBanner'); if (qb) qb.className = 'queue-status-banner status-waiting';
+        const qt = document.getElementById('queueTabStatusText'); if (qt) qt.textContent = scheduledText;
+        return;
+    }
+
+    const myToken = myActiveAppointment.queueNumber;
+    const entries = summary.entries || [];
+    const myEntry = entries.find(e => (myToken && e.queueNumber === myToken) || e.appointmentId === myActiveAppointment.id || e.id === myActiveAppointment.id);
 
     if (serving === myToken || (myEntry && (myEntry.status === 'CALLED' || myEntry.status === 'IN_CONSULTATION'))) {
         document.getElementById('peopleAheadCount').textContent = '0';
@@ -681,10 +697,10 @@ function updateLiveQueueTicket(summary) {
         const qw = document.getElementById('queueTabWait'); if (qw) qw.textContent = 'Done';
         const qb = document.getElementById('queueTabStatusBanner'); if (qb) qb.className = 'queue-status-banner status-completed';
         const qt = document.getElementById('queueTabStatusText'); if (qt) qt.textContent = 'Consultation Completed. Thank you!';
-    } else {
+    } else if (myEntry && myEntry.status === 'WAITING') {
         let waitingEntries = entries.filter(e => e.status === 'WAITING');
-        let myIndex = waitingEntries.findIndex(e => e.queueNumber === myToken);
-        let aheadCount = myIndex >= 0 ? myIndex : waitingEntries.length;
+        let myIndex = waitingEntries.findIndex(e => (myToken && e.queueNumber === myToken) || e.appointmentId === myActiveAppointment.id || e.id === myActiveAppointment.id);
+        let aheadCount = myIndex >= 0 ? myIndex : 0;
         const waitStr = aheadCount === 0 ? 'Next up!' : `${aheadCount * 10} mins`;
         
         let statusStr = `Waiting in queue (${aheadCount} patient${aheadCount !== 1 ? 's' : ''} ahead)`;
@@ -703,6 +719,17 @@ function updateLiveQueueTicket(summary) {
         // Mirror to queue tab
         const qa = document.getElementById('queueTabAhead'); if (qa) qa.textContent = aheadCount;
         const qw = document.getElementById('queueTabWait'); if (qw) qw.textContent = waitStr;
+        const qb = document.getElementById('queueTabStatusBanner'); if (qb) qb.className = 'queue-status-banner status-waiting';
+        const qt = document.getElementById('queueTabStatusText'); if (qt) qt.textContent = statusStr;
+    } else {
+        const waitingCount = summary.waitingCount || 0;
+        const statusStr = `📅 Today at ${myActiveAppointment.timeSlot || ''} (Token ${myActiveAppointment.queueNumber || '--'})`;
+        document.getElementById('peopleAheadCount').textContent = waitingCount;
+        document.getElementById('estWaitTime').textContent = waitingCount ? `${waitingCount * 10} mins` : '--';
+        document.getElementById('queueStatusBanner').className = 'queue-status-banner status-waiting';
+        document.getElementById('queueStatusText').textContent = statusStr;
+        const qa = document.getElementById('queueTabAhead'); if (qa) qa.textContent = waitingCount;
+        const qw = document.getElementById('queueTabWait'); if (qw) qw.textContent = waitingCount ? `${waitingCount * 10} mins` : '--';
         const qb = document.getElementById('queueTabStatusBanner'); if (qb) qb.className = 'queue-status-banner status-waiting';
         const qt = document.getElementById('queueTabStatusText'); if (qt) qt.textContent = statusStr;
     }
