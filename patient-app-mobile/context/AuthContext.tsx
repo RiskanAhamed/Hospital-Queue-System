@@ -53,11 +53,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const storedHospitalName = await getSecureItem(STORAGE_KEYS.HOSPITAL_NAME);
 
         if (storedToken && storedUserJson) {
-          const parsedUser = JSON.parse(storedUserJson);
-          setToken(storedToken);
-          setUser(parsedUser);
-          setHospitalId(storedHospitalId);
-          setHospitalName(storedHospitalName);
+          const decoded = decodeJwt(storedToken);
+          const nowInSecs = Math.floor(Date.now() / 1000);
+          if (decoded && decoded.exp && decoded.exp < nowInSecs) {
+            console.log('Stored auth token is expired. Clearing storage.');
+            await clearAuthStorage();
+          } else {
+            const parsedUser = JSON.parse(storedUserJson);
+            setToken(storedToken);
+            setUser(parsedUser);
+            setHospitalId(storedHospitalId);
+            setHospitalName(storedHospitalName);
+          }
         }
       } catch (error) {
         console.error('Failed to load stored auth details:', error);

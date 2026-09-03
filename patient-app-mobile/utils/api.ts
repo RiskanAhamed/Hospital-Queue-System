@@ -40,7 +40,18 @@ export function decodeJwt(token: string): any {
     }
     
     // Decode UTF-8 correctly
-    return JSON.parse(decodeURIComponent(escape(raw)));
+    try {
+      return JSON.parse(
+        decodeURIComponent(
+          raw
+            .split('')
+            .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+            .join('')
+        )
+      );
+    } catch {
+      return JSON.parse(raw);
+    }
   } catch (error) {
     console.error('Error decoding JWT token:', error);
     return null;
