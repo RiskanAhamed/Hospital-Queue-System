@@ -34,6 +34,7 @@ public class AuthControllerTest {
     @Mock private LoginAttemptRepository loginAttemptRepository;
     @Mock private PasswordResetTokenRepository passwordResetTokenRepository;
     @Mock private com.hospital.queue.security.TenantSecurityService tenantSecurityService;
+    @Mock private com.hospital.queue.service.EmailService emailService;
 
     private AuthController authController;
 
@@ -42,7 +43,7 @@ public class AuthControllerTest {
         authController = new AuthController(
                 auditLogService, userRepository, hospitalRepository, doctorRepository,
                 passwordEncoder, tokenProvider, loginAttemptRepository, passwordResetTokenRepository,
-                tenantSecurityService
+                tenantSecurityService, emailService
         );
     }
 
@@ -160,5 +161,29 @@ public class AuthControllerTest {
         assertEquals(HttpStatus.TOO_MANY_REQUESTS, response.getStatusCode());
         // Should not even attempt to look up the user
         verify(userRepository, never()).findByEmail(anyString());
+    }
+
+    @Test
+    void testChangePasswordSuccess() {
+        AuthController.ChangePasswordRequest req = new AuthController.ChangePasswordRequest();
+        req.setCurrentPassword("oldPass123");
+        req.setNewPassword("newPass456");
+
+        com.hospital.queue.security.UserPrincipal principal = new com.hospital.queue.security.UserPrincipal("u1", "patient@test.com", "PATIENT", "h1");
+        when(tenantSecurityService.getCurrentUser()).thenReturn(principal);
+
+        User user = new User();
+        user.setId("u1");
+        user.setEmail("patient@test.com");
+        user.setPassword("hashedOldPass");
+        when(userRepository.findById("u1")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("oldPass123", "hashedOldPass")).thenReturn(true);
+        when(passwordEncoder.encode("newPass456")).thenReturn("hashedNewPass");
+
+        ResponseEntity<?> response = authController.changePassword(req);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals("hashedNewPass", user.getPassword());
+        verify(userRepository).save(user);
     }
 }

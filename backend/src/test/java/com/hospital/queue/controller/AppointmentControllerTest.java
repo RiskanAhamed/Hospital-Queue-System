@@ -202,4 +202,34 @@ public class AppointmentControllerTest {
         assertEquals(1, response.getBody().size());
         assertEquals("appt111", response.getBody().get(0).getId());
     }
+
+    @Test
+    public void testPatientFilterByDoctorIdReturnsOnlyDoctorAppointments() {
+        String hospitalId = "HOSP001";
+        String patientId = "patient789";
+        String doctorBId = "docB";
+
+        UserPrincipal principal = new UserPrincipal(patientId, "patient@test.com", "PATIENT", hospitalId);
+        when(tenantSecurityService.getCurrentUser()).thenReturn(principal);
+
+        Appointment docBAppt = new Appointment();
+        docBAppt.setId("appt-doc-b");
+        docBAppt.setDoctorId(doctorBId);
+        docBAppt.setHospitalId(hospitalId);
+        docBAppt.setPatientId("otherPatient123");
+        docBAppt.setAppointmentDate("2026-09-04");
+        docBAppt.setTimeSlot("10:00");
+        docBAppt.setStatus("BOOKED");
+
+        when(appointmentRepository.findByHospitalIdAndDoctorId(hospitalId, doctorBId))
+                .thenReturn(Arrays.asList(docBAppt));
+
+        ResponseEntity<java.util.List<Appointment>> response = appointmentController.getAppointments(hospitalId, null, doctorBId);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(1, response.getBody().size());
+        Appointment result = response.getBody().get(0);
+        assertEquals(doctorBId, result.getDoctorId());
+        assertEquals("10:00", result.getTimeSlot());
+    }
 }

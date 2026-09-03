@@ -104,4 +104,56 @@ public class DoctorController {
         }
         return ResponseEntity.ok(saved);
     }
+
+    @PutMapping("/{doctorId}/schedule")
+    public ResponseEntity<?> updateDoctorSchedule(
+            @PathVariable String hospitalId,
+            @PathVariable String doctorId,
+            @RequestBody java.util.Map<String, Object> body) {
+        tenantSecurityService.validateTenantAccess(hospitalId, Role.HOSPITAL_ADMIN, Role.DOCTOR, Role.STAFF);
+        Doctor doc = doctorRepository.findById(doctorId).orElse(null);
+        if (doc == null || !doc.getHospitalId().equals(hospitalId)) {
+            return ResponseEntity.notFound().build();
+        }
+
+        if (body.containsKey("availableSlots")) {
+            @SuppressWarnings("unchecked")
+            List<String> slots = (List<String>) body.get("availableSlots");
+            if (slots != null) {
+                slots.sort(String::compareTo);
+                doc.setAvailableSlots(slots);
+            }
+        }
+
+        if (body.containsKey("maxDailyAppointments")) {
+            Object maxAppt = body.get("maxDailyAppointments");
+            if (maxAppt instanceof Number) {
+                doc.setMaxDailyAppointments(((Number) maxAppt).intValue());
+            }
+        }
+
+        if (body.containsKey("roomNumber")) {
+            doc.setRoomNumber(String.valueOf(body.get("roomNumber")));
+        }
+
+        if (body.containsKey("status")) {
+            doc.setStatus(String.valueOf(body.get("status")));
+        }
+
+        if (body.containsKey("available")) {
+            doc.setAvailable(Boolean.TRUE.equals(body.get("available")));
+        }
+
+        Doctor saved = doctorRepository.save(doc);
+        auditLogService.log(hospitalId, tenantSecurityService.getCurrentUser().getUserId(), "DOCTOR_SCHEDULE_UPDATED",
+                "Updated schedule for Dr. " + saved.getName() + " with " + (saved.getAvailableSlots() != null ? saved.getAvailableSlots().size() : 0) + " slots.");
+
+        try {
+            messagingTemplate.convertAndSend("/topic/hospital/" + hospitalId + "/doctors", saved);
+        } catch (Exception e) {
+            log.error("Failed to broadcast doctor schedule update: {}", e.getMessage(), e);
+        }
+
+        return ResponseEntity.ok(saved);
+    }
 }

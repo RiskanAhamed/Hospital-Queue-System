@@ -41,6 +41,7 @@ public class AuthController {
     private final LoginAttemptRepository loginAttemptRepository;
     private final PasswordResetTokenRepository passwordResetTokenRepository;
     private final TenantSecurityService tenantSecurityService;
+    private final com.hospital.queue.service.EmailService emailService;
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request) {
@@ -190,14 +191,22 @@ public class AuthController {
         private String password;
     }
 
+    @Data
+    public static class ChangePasswordRequest {
+        @jakarta.validation.constraints.NotBlank
+        private String currentPassword;
+
+        @jakarta.validation.constraints.NotBlank
+        @jakarta.validation.constraints.Size(min = 6, max = 100, message = "Password must be between 6 and 100 characters")
+        private String newPassword;
+    }
+
     @PostMapping("/forgot-password")
     public ResponseEntity<?> forgotPassword(@Valid @RequestBody ForgotPasswordRequest req) {
         String email = req.getEmail().toLowerCase();
         Optional<User> userOpt = userRepository.findByEmail(email);
 
-        // FIX #3: Always return the same generic message regardless of whether the email exists.
-        // This prevents user enumeration attacks.
-        String genericMessage = "If an account with that email exists, a password reset link has been generated. Check server console logs for the reset token.";
+        String genericMessage = "If an account with that email exists, a password reset verification code has been dispatched.";
 
         if (userOpt.isEmpty()) {
             return ResponseEntity.ok(java.util.Map.of("message", genericMessage));
@@ -206,36 +215,49 @@ public class AuthController {
         // Delete any existing reset tokens for this email
         passwordResetTokenRepository.deleteByEmail(email);
 
-        String tokenStr = UUID.randomUUID().toString();
+        // Generate 6-digit OTP reset code
+        String tokenStr = String.format("%06d", new java.util.Random().nextInt(900000) + 100000);
         PasswordResetToken resetToken = new PasswordResetToken();
         resetToken.setEmail(email);
         resetToken.setToken(tokenStr);
         resetToken.setExpiryTime(LocalDateTime.now().plusMinutes(WINDOW_MINUTES));
         passwordResetTokenRepository.save(resetToken);
 
-        // FIX #3: Token is ONLY printed to server console — NEVER returned in the response body.
+        // Send real email if SMTP is configured
+        String resetLink = "https://riskanahamed.github.io/Hospital-Queue-System/patient-app/?token=" + tokenStr;
+        emailService.sendPasswordResetEmail(email, tokenStr, resetLink);
+
         log.info("=================================================");
         log.info("PASSWORD RESET REQUEST");
         log.info("Email: {}", email);
-        log.info("Reset Token: {}", tokenStr);
-        log.info("Reset Link (Admin): http://localhost:3000/login.html?token={}", tokenStr);
-        log.info("Reset Link (Patient): http://localhost:3001/?token={}", tokenStr);
+        log.info("Reset Code: {}", tokenStr);
         log.info("=================================================");
 
-        return ResponseEntity.ok(java.util.Map.of("message", genericMessage));
+        // If email service is not configured (e.g. testing/demo without SMTP credentials),
+        // return resetToken in response for smooth testing
+        if (!emailService.isEmailConfigured()) {
+            return ResponseEntity.ok(java.util.Map.of(
+                "message", "Verification code generated. Code: " + tokenStr,
+                "resetToken", tokenStr
+            ));
+        }
+
+        return ResponseEntity.ok(java.util.Map.of(
+            "message", "A 6-digit reset code has been sent to " + email + ". Please check your inbox."
+        ));
     }
 
     @PostMapping("/reset-password")
     public ResponseEntity<?> resetPassword(@Valid @RequestBody ResetPasswordRequest req) {
         Optional<PasswordResetToken> tokenOpt = passwordResetTokenRepository.findByToken(req.getToken());
         if (tokenOpt.isEmpty()) {
-            return ResponseEntity.badRequest().body("Invalid password reset token.");
+            return ResponseEntity.badRequest().body("Invalid password reset code.");
         }
 
         PasswordResetToken resetToken = tokenOpt.get();
         if (LocalDateTime.now().isAfter(resetToken.getExpiryTime())) {
             passwordResetTokenRepository.deleteByToken(req.getToken());
-            return ResponseEntity.badRequest().body("Password reset token has expired.");
+            return ResponseEntity.badRequest().body("Password reset code has expired.");
         }
 
         Optional<User> userOpt = userRepository.findByEmail(resetToken.getEmail());
@@ -251,6 +273,25 @@ public class AuthController {
         auditLogService.log(user.getHospitalId(), user.getId(), "PASSWORD_RESET", "Password was reset for user: " + user.getEmail());
 
         return ResponseEntity.ok(java.util.Map.of("message", "Password reset successfully. You can now login with your new password."));
+    }
+
+    @PutMapping("/change-password")
+    public ResponseEntity<?> changePassword(@Valid @RequestBody ChangePasswordRequest req) {
+        UserPrincipal currentUser = tenantSecurityService.getCurrentUser();
+        User user = userRepository.findById(currentUser.getUserId()).orElse(null);
+        if (user == null) {
+            return ResponseEntity.badRequest().body("User not found.");
+        }
+
+        if (!passwordEncoder.matches(req.getCurrentPassword(), user.getPassword())) {
+            return ResponseEntity.badRequest().body("Current password is incorrect.");
+        }
+
+        user.setPassword(passwordEncoder.encode(req.getNewPassword()));
+        userRepository.save(user);
+
+        auditLogService.log(user.getHospitalId(), user.getId(), "PASSWORD_CHANGED", "User changed their password: " + user.getEmail());
+        return ResponseEntity.ok(java.util.Map.of("message", "Password changed successfully."));
     }
 
     @PostMapping("/push-token")

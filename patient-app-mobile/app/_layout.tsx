@@ -8,7 +8,7 @@ global.TextDecoder = TextDecoder as any;
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { ActivityIndicator, View, StyleSheet } from 'react-native';
+import { ActivityIndicator, View, StyleSheet, Image, Text } from 'react-native';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AuthProvider, useAuth } from '../context/AuthContext';
 import LoginScreen from './login';
@@ -44,7 +44,16 @@ function AppContent() {
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
-        <ActivityIndicator size="large" color="#38BDF8" />
+        <Image
+          source={require('../assets/images/icon.png')}
+          style={styles.splashLogo}
+          resizeMode="contain"
+        />
+        <Text style={styles.splashBrand}>
+          Medi<Text style={{ color: '#38BDF8' }}>Flow</Text>
+        </Text>
+        <Text style={styles.splashTagline}>Hospital Queue & Appointments</Text>
+        <ActivityIndicator size="small" color="#38BDF8" style={{ marginTop: 24 }} />
       </View>
     );
   }
@@ -66,11 +75,15 @@ function AppContent() {
   );
 }
 
+import { LanguageProvider } from '../context/LanguageContext';
+
 export default function RootLayout() {
   return (
     <AuthProvider>
-      <AppContent />
-      <StatusBar style="light" />
+      <LanguageProvider>
+        <AppContent />
+        <StatusBar style="light" />
+      </LanguageProvider>
     </AuthProvider>
   );
 }
@@ -81,5 +94,29 @@ const styles = StyleSheet.create({
     backgroundColor: '#090D16',
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 24,
+  },
+  splashLogo: {
+    width: 88,
+    height: 88,
+    borderRadius: 22,
+    marginBottom: 16,
+    shadowColor: '#38BDF8',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.35,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  splashBrand: {
+    color: '#F8FAFC',
+    fontSize: 26,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+    marginBottom: 6,
+  },
+  splashTagline: {
+    color: '#94A3B8',
+    fontSize: 14,
+    fontWeight: '500',
   },
 });

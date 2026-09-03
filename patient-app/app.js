@@ -103,6 +103,7 @@ function fetchHospitalDetails() {
 function openPatientAuthModal() {
     const modal = document.getElementById('patientAuthModal');
     if (modal) modal.style.display = 'flex';
+    if (window.lucide) lucide.createIcons();
 }
 
 function closePatientAuthModal() {
@@ -229,9 +230,29 @@ function fetchPatientAppointments() {
         .then(r => r.ok ? r.json() : [])
         .then(appts => {
             const cancelBtn = document.getElementById('btnCancelAppointment');
+            const multiSelector = document.getElementById('multiApptSelector');
+            const multiPills = document.getElementById('multiApptPills');
+            const multiTitle = document.getElementById('multiApptTitle');
+
             if (appts && appts.length > 0) {
-                // Find latest active appointment
-                const active = appts.find(a => a.status === 'BOOKED' || a.status === 'CHECKED_IN' || a.status === 'WAITING' || a.status === 'CALLED' || a.status === 'IN_CONSULTATION') || appts[appts.length - 1];
+                const activeList = appts.filter(a => a.status === 'BOOKED' || a.status === 'CHECKED_IN' || a.status === 'WAITING' || a.status === 'CALLED' || a.status === 'IN_CONSULTATION');
+                
+                if (multiSelector && multiPills && activeList.length > 1) {
+                    multiSelector.style.display = 'block';
+                    if (multiTitle) multiTitle.textContent = `Active Appointments (${activeList.length})`;
+                    multiPills.innerHTML = activeList.map(a => {
+                        const isSel = myActiveAppointment && myActiveAppointment.id === a.id;
+                        return `<button onclick="selectActiveAppointment('${a.id}')" style="background:${isSel ? 'var(--primary)' : 'rgba(255,255,255,0.06)'}; color:${isSel ? '#090D16' : '#fff'}; border:1px solid ${isSel ? 'var(--primary)' : 'rgba(255,255,255,0.12)'}; padding:6px 12px; border-radius:20px; font-size:0.8rem; font-weight:700; cursor:pointer; white-space:nowrap; display:flex; align-items:center; gap:6px;">
+                            <i data-lucide="cross" style="width:12px; height:12px;"></i> ${a.doctorName} (${a.queueNumber || a.timeSlot})
+                        </button>`;
+                    }).join('');
+                    if (window.lucide) lucide.createIcons();
+                } else if (multiSelector) {
+                    multiSelector.style.display = 'none';
+                }
+
+                // Pick active appointment
+                const active = (myActiveAppointment && activeList.find(a => a.id === myActiveAppointment.id)) || activeList[0] || appts[appts.length - 1];
                 if (active) {
                     myActiveAppointment = active;
                     currentDoctorId = active.doctorId;
@@ -249,11 +270,26 @@ function fetchPatientAppointments() {
                 } else if (cancelBtn) {
                     cancelBtn.style.display = 'none';
                 }
-            } else if (cancelBtn) {
-                cancelBtn.style.display = 'none';
+            } else {
+                if (multiSelector) multiSelector.style.display = 'none';
+                if (cancelBtn) cancelBtn.style.display = 'none';
             }
         })
         .catch(err => console.error('Error fetching patient appointments:', err));
+}
+
+function selectActiveAppointment(apptId) {
+    const auth = getPatientAuth();
+    if (!auth || !auth.userId) return;
+    authFetch(`${API_BASE}/hospitals/${currentHospitalId}/appointments?patientId=${auth.userId}`)
+        .then(r => r.ok ? r.json() : [])
+        .then(appts => {
+            const found = (appts || []).find(a => a.id === apptId);
+            if (found) {
+                myActiveAppointment = found;
+                fetchPatientAppointments();
+            }
+        });
 }
 
 function cancelMyAppointment() {
@@ -1171,8 +1207,14 @@ async function submitPatientForgotPassword() {
         if (res.ok) {
             const data = await res.json();
             closePatientForgotModal();
-            alert(`Reset link printed to server console! Token: ${data.token}\n\nPlease copy this token.`);
-            openPatientResetModal(data.token);
+            const token = data.resetToken || data.token || '';
+            if (token) {
+                alert(`Verification code generated: ${token}\n\nAuto-filling code to reset password.`);
+                openPatientResetModal(token);
+            } else {
+                alert(data.message || 'Verification code sent to your email. Please enter it on the next screen.');
+                openPatientResetModal('');
+            }
         } else {
             alert(await res.text());
         }

@@ -93,6 +93,32 @@ public class QueueService {
         appointment.setStatus("CHECKED_IN");
         appointmentRepository.save(appointment);
 
+        // Check if patient is first or next in line (e.g. no one ahead)
+        List<QueueEntry> waitingList = queueRepository.findByHospitalIdAndDoctorIdAndQueueDateAndStatusOrderBySequenceNumberAsc(
+                appointment.getHospitalId(), appointment.getDoctorId(), targetDate, "WAITING");
+
+        if (waitingList.size() <= 1) {
+            Optional<Doctor> docOpt = doctorRepository.findById(appointment.getDoctorId());
+            String roomNum = docOpt.map(Doctor::getRoomNumber).orElse("TBD");
+            String doctorName = docOpt.map(Doctor::getName).orElse(appointment.getDoctorName() != null ? appointment.getDoctorName() : "Doctor");
+            String lang = getPatientLanguage(appointment.getPatientId());
+
+            String nextTitle = "en".equalsIgnoreCase(lang)
+                    ? "You're Next, Please Be Ready!"
+                    : "அடுத்து உங்கள் முறை! (You're Next)";
+            String nextMsg = "en".equalsIgnoreCase(lang)
+                    ? "Your token is " + queueNum + ". There is no one ahead for Dr. " + doctorName + ". Please be ready near Room " + roomNum + "."
+                    : "உங்கள் டோக்கன் " + queueNum + ". Dr. " + doctorName + "-ஐ சந்திக்க வரிசையில் யாரும் இல்லை (அடுத்து உங்கள் முறை). தயவுசெய்து அறை " + roomNum + " அருகே தயாராக இருக்கவும்.";
+
+            notificationService.createAndSendNotification(
+                    appointment.getHospitalId(),
+                    appointment.getPatientId(),
+                    "QUEUE_NEXT",
+                    nextTitle,
+                    nextMsg
+            );
+        }
+
         broadcastQueueState(appointment.getHospitalId(), appointment.getDoctorId());
         return saved;
     }

@@ -17,6 +17,7 @@ import { useAuth } from '../../context/AuthContext';
 import { authFetch } from '../../utils/api';
 import { useRouter } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
+import { useLanguage } from '../../context/LanguageContext';
 
 interface Appointment {
   id: string;
@@ -45,6 +46,7 @@ const STATUS_COLORS: Record<string, { bg: string; color: string }> = {
 
 export default function AppointmentsScreen() {
   const { hospitalId, user } = useAuth();
+  const { t } = useLanguage();
   const router = useRouter();
   const isFocused = useIsFocused();
 
@@ -185,7 +187,7 @@ export default function AppointmentsScreen() {
     <View style={styles.container}>
       {/* Header bar */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>My Appointments</Text>
+        <Text style={styles.headerTitle}>{t.myAppointmentsTitle}</Text>
         <TouchableOpacity style={styles.refreshBtn} onPress={onRefresh}>
           <Ionicons name="refresh" size={20} color="#38BDF8" />
         </TouchableOpacity>
@@ -198,9 +200,9 @@ export default function AppointmentsScreen() {
         {appointments.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Ionicons name="calendar-outline" size={60} color="#64748B" style={{ marginBottom: 12 }} />
-            <Text style={styles.emptyTitle}>No appointments yet</Text>
+            <Text style={styles.emptyTitle}>{t.noAppointments}</Text>
             <Text style={styles.emptySubtitle}>
-              Book your first appointment from the Home tab.
+              {t.bookYourFirst}
             </Text>
           </View>
         ) : (

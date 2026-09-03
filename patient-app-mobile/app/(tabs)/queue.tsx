@@ -19,6 +19,7 @@ import {
   unsubscribeFromQueue,
 } from '../../utils/websocket';
 import { useIsFocused } from '@react-navigation/native';
+import { useLanguage } from '../../context/LanguageContext';
 
 interface Appointment {
   id: string;
@@ -33,6 +34,7 @@ interface Appointment {
 
 export default function QueueScreen() {
   const { token, hospitalId, user } = useAuth();
+  const { t } = useLanguage();
   const isFocused = useIsFocused();
 
   const [activeAppointment, setActiveAppointment] = useState<Appointment | null>(null);
@@ -175,7 +177,7 @@ export default function QueueScreen() {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Live Queue Status</Text>
+        <Text style={styles.headerTitle}>{t.realTimeQueueTracker}</Text>
       </View>
 
       <ScrollView
@@ -184,39 +186,39 @@ export default function QueueScreen() {
       >
         <View style={styles.ticketCard}>
           <View style={styles.ticketHeader}>
-            <Text style={styles.ticketHeaderSub}>Your Active Queue Ticket</Text>
+            <Text style={styles.ticketHeaderSub}>{t.activeTokenHeader}</Text>
             <View style={[styles.badge, activeAppointment ? styles.badgeActive : styles.badgeInactive]}>
               <Text style={[styles.badgeText, activeAppointment ? styles.badgeTextActive : styles.badgeTextInactive]}>
-                {activeAppointment ? 'Active' : 'No Booking'}
+                {activeAppointment ? 'Active' : t.noActiveBooking}
               </Text>
             </View>
           </View>
 
           <View style={styles.ticketBody}>
-            <Text style={styles.label}>Your Token</Text>
+            <Text style={styles.label}>{t.yourQueueToken}</Text>
             <Text style={styles.tokenNumber}>
               {activeAppointment ? activeAppointment.queueNumber : '--'}
             </Text>
             <Text style={styles.doctorName}>
               {activeAppointment
                 ? `${activeAppointment.doctorName} (${activeAppointment.departmentName})`
-                : 'No active booking'}
+                : t.noActiveBooking}
             </Text>
 
             {/* Live stats row */}
             <View style={styles.countersRow}>
               <View style={styles.counterBox}>
-                <Text style={styles.counterLabel}>Now Serving</Text>
+                <Text style={styles.counterLabel}>{t.currentlyServing}</Text>
                 <Text style={styles.counterValue}>{currentlyServing}</Text>
               </View>
               <View style={styles.divider} />
               <View style={styles.counterBox}>
-                <Text style={styles.counterLabel}>Ahead of You</Text>
+                <Text style={styles.counterLabel}>{t.peopleAhead}</Text>
                 <Text style={styles.counterValue}>{peopleAhead}</Text>
               </View>
               <View style={styles.divider} />
               <View style={styles.counterBox}>
-                <Text style={styles.counterLabel}>Est. Wait</Text>
+                <Text style={styles.counterLabel}>{t.estWaitTime}</Text>
                 <Text style={styles.counterValue}>{estWaitTime}</Text>
               </View>
             </View>

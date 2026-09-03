@@ -93,7 +93,7 @@ export function unsubscribeFromQueue() {
 export function subscribeToNotifications(
   hospitalId: string,
   userId: string,
-  onMessage: () => void
+  onMessage: (notification?: any) => void
 ) {
   if (!stompClient || !stompClient.connected) {
     console.warn('STOMP Client is not connected');
@@ -106,8 +106,13 @@ export function subscribeToNotifications(
   }
 
   const topic = `/topic/hospital/${hospitalId}/user/${userId}/notifications`;
-  notificationSubscription = stompClient.subscribe(topic, () => {
-    onMessage();
+  notificationSubscription = stompClient.subscribe(topic, (message: IMessage) => {
+    try {
+      const data = JSON.parse(message.body);
+      onMessage(data);
+    } catch {
+      onMessage();
+    }
   });
 }
 

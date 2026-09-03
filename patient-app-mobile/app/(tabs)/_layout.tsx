@@ -4,8 +4,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
+import { useLanguage } from '../../context/LanguageContext';
+
 export default function TabLayout() {
   const colorScheme = useColorScheme();
+  const { t } = useLanguage();
   
   // Custom dark theme colors matching style.css
   const activeColor = '#38BDF8'; // --primary
@@ -30,7 +33,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
+          title: t.home,
           tabBarIcon: ({ color, focused }) => (
             <Ionicons size={24} name={focused ? 'home' : 'home-outline'} color={color} />
           ),
@@ -39,7 +42,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="appointments"
         options={{
-          title: 'Appointments',
+          title: t.appointments,
           tabBarIcon: ({ color, focused }) => (
             <Ionicons size={24} name={focused ? 'calendar' : 'calendar-outline'} color={color} />
           ),
@@ -48,7 +51,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="queue"
         options={{
-          title: 'Live Queue',
+          title: t.liveQueue,
           tabBarIcon: ({ color, focused }) => (
             <Ionicons size={24} name={focused ? 'pulse' : 'pulse-outline'} color={color} />
           ),
@@ -57,7 +60,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="profile"
         options={{
-          title: 'Profile',
+          title: t.profile,
           tabBarIcon: ({ color, focused }) => (
             <Ionicons size={24} name={focused ? 'person' : 'person-outline'} color={color} />
           ),

@@ -41,6 +41,7 @@ public class PushNotificationService {
             payload.put("title", title);
             payload.put("body", body);
             payload.put("priority", "high");
+            payload.put("channelId", "default");
             if (data != null && !data.isEmpty()) {
                 payload.put("data", data);
             }

@@ -9,6 +9,7 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
+  Image,
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE } from '../utils/api';
@@ -134,8 +135,13 @@ export default function LoginScreen() {
       });
       if (res.ok) {
         const data = await res.json();
-        setSuccessMessage(data.message || 'If an account exists, a reset token was logged in server console. Please enter the token below.');
-        setResetToken('');
+        if (data.resetToken) {
+          setResetToken(data.resetToken);
+          setSuccessMessage('Verification code generated and auto-filled! Please set your new password below.');
+        } else {
+          setResetToken('');
+          setSuccessMessage(data.message || 'A 6-digit verification code has been sent to your email. Please enter it below.');
+        }
         setIsForgot(false);
         setIsReset(true);
       } else {
@@ -186,6 +192,18 @@ export default function LoginScreen() {
       style={styles.container}
     >
       <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
+        <View style={styles.brandHeader}>
+          <Image
+            source={require('../assets/images/icon.png')}
+            style={styles.brandLogo}
+            resizeMode="contain"
+          />
+          <Text style={styles.brandName}>
+            Medi<Text style={{ color: '#38BDF8' }}>Flow</Text>
+          </Text>
+          <Text style={styles.brandTagline}>Real-Time Hospital Queue & Appointments</Text>
+        </View>
+
         <View style={styles.card}>
           <Text style={styles.title}>
             {isForgot
@@ -252,10 +270,10 @@ export default function LoginScreen() {
             // Reset Password Screen
             <View style={styles.form}>
               <View style={styles.formGroup}>
-                <Text style={styles.label}>Reset Token</Text>
+                <Text style={styles.label}>Verification Code (OTP)</Text>
                 <TextInput
                   style={styles.input}
-                  placeholder="Enter reset token from console"
+                  placeholder="Enter 6-digit code"
                   placeholderTextColor="#64748B"
                   value={resetToken}
                   onChangeText={setResetToken}
@@ -456,8 +474,36 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 8,
   },
+  brandHeader: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  brandLogo: {
+    width: 72,
+    height: 72,
+    borderRadius: 18,
+    marginBottom: 12,
+    shadowColor: '#38BDF8',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 6,
+  },
+  brandName: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#F8FAFC',
+    letterSpacing: 0.5,
+  },
+  brandTagline: {
+    fontSize: 13,
+    fontWeight: '500',
+    color: '#94A3B8',
+    marginTop: 4,
+    textAlign: 'center',
+  },
   title: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: '700',
     color: '#F8FAFC',
     textAlign: 'center',

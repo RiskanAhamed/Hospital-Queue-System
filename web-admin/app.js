@@ -946,6 +946,7 @@ function renderDoctorsGrid() {
     container.innerHTML = doctorsData.map(doc => {
         const rating = doc.averageRating || 5.0;
         const reviews = doc.totalRatings || 0;
+        const slotCount = (doc.availableSlots && doc.availableSlots.length) || 0;
         return `
             <div class="card glass doctor-card" style="padding: 20px;">
                 <div style="display: flex; gap: 16px; align-items: center; margin-bottom: 16px;">
@@ -961,15 +962,150 @@ function renderDoctorsGrid() {
                     </div>
                 </div>
                 <div style="display: flex; justify-content: space-between; align-items: center; padding-top: 12px; border-top: 1px solid var(--border-color); flex-wrap: wrap; gap: 8px;">
-                    <span class="status-badge status-${doc.available ? 'called' : 'idle'}">${doc.available ? '● Available' : '○ On Leave'}</span>
                     <div style="display:flex; align-items:center; gap:8px;">
-                        <span style="font-size: 0.8rem; color: var(--text-muted);">Max: ${doc.maxDailyAppointments || 30}/day</span>
+                        <span class="status-badge status-${doc.available ? 'called' : 'idle'}">${doc.available ? '● Available' : '○ On Leave'}</span>
+                        <span style="font-size: 0.75rem; color: var(--primary); background: rgba(56,189,248,0.1); padding: 2px 8px; border-radius: 8px; font-weight:600;">⏰ ${slotCount} Slots</span>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <button class="btn btn-sm btn-secondary" onclick="openDoctorScheduleModal('${doc.id}')"><i data-lucide="clock"></i> Edit Schedule</button>
                         <button class="btn btn-sm ${doc.available ? 'btn-warning' : 'btn-primary'}" onclick="toggleDoctorAvailability('${doc.id}', ${!!doc.available})">${doc.available ? 'Mark Unavailable' : 'Mark Available'}</button>
                     </div>
                 </div>
             </div>
         `;
     }).join('');
+
+    if (window.lucide && typeof window.lucide.createIcons === 'function') {
+        window.lucide.createIcons();
+    }
+}
+
+// --- Doctor Schedule & Time Slots Management Logic ---
+const DEFAULT_SYSTEM_SLOTS = [
+    '08:00', '08:30', '09:00', '09:30', '10:00', '10:30', '11:00', '11:30',
+    '12:00', '12:30', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30',
+    '17:00', '17:30', '18:00', '18:30', '19:00', '19:30', '20:00'
+];
+let _currentEditingDoctorSlots = new Set();
+
+function openDoctorScheduleModal(docId) {
+    const doc = doctorsData.find(d => d.id === docId);
+    if (!doc) return;
+
+    document.getElementById('schedDocId').value = doc.id;
+    document.getElementById('schedDocName').textContent = `Schedule for ${doc.name}`;
+    document.getElementById('schedRoomNumber').value = doc.roomNumber || 'Room 302';
+    document.getElementById('schedMaxPatients').value = doc.maxDailyAppointments || 30;
+
+    const existingSlots = (doc.availableSlots && doc.availableSlots.length > 0)
+        ? doc.availableSlots
+        : ['09:00', '09:30', '10:00', '10:30', '11:00', '11:30', '14:00', '14:30', '15:00'];
+
+    _currentEditingDoctorSlots = new Set(existingSlots);
+    renderScheduleSlotPills();
+
+    const modal = document.getElementById('modalDoctorSchedule');
+    if (modal) modal.classList.add('active');
+}
+
+function closeDoctorScheduleModal() {
+    const modal = document.getElementById('modalDoctorSchedule');
+    if (modal) modal.classList.remove('active');
+}
+
+function renderScheduleSlotPills() {
+    const container = document.getElementById('slotsGridContainer');
+    const countEl = document.getElementById('selectedSlotsCount');
+    if (!container) return;
+
+    if (countEl) countEl.textContent = _currentEditingDoctorSlots.size;
+
+    // Union of default slots and any custom ones added
+    const allSlots = Array.from(new Set([...DEFAULT_SYSTEM_SLOTS, ..._currentEditingDoctorSlots])).sort();
+
+    container.innerHTML = allSlots.map(slot => {
+        const isSelected = _currentEditingDoctorSlots.has(slot);
+        const [hh, mm] = slot.split(':');
+        const h = parseInt(hh, 10);
+        const p = h < 12 ? 'AM' : 'PM';
+        const dh = h === 0 ? 12 : h > 12 ? h - 12 : h;
+        const formatted = `${String(dh).padStart(2, '0')}:${mm} ${p}`;
+
+        return `
+            <div onclick="toggleSlotSelection('${slot}')" style="display:flex; align-items:center; justify-content:center; padding:7px 10px; border-radius:8px; font-size:0.78rem; font-weight:700; cursor:pointer; transition:all 0.2s; user-select:none; background:${isSelected ? 'rgba(56,189,248,0.2)' : 'rgba(255,255,255,0.04)'}; color:${isSelected ? '#38BDF8' : '#94A3B8'}; border:1px solid ${isSelected ? '#38BDF8' : 'rgba(255,255,255,0.08)'};">
+                ${isSelected ? '✓ ' : ''}${formatted}
+            </div>
+        `;
+    }).join('');
+}
+
+function toggleSlotSelection(slot) {
+    if (_currentEditingDoctorSlots.has(slot)) {
+        _currentEditingDoctorSlots.delete(slot);
+    } else {
+        _currentEditingDoctorSlots.add(slot);
+    }
+    renderScheduleSlotPills();
+}
+
+function applySlotPreset(preset) {
+    if (preset === 'morning') {
+        _currentEditingDoctorSlots = new Set(['08:30', '09:00', '09:30', '10:00', '10:30', '11:00', '11:30', '12:00']);
+    } else if (preset === 'evening') {
+        _currentEditingDoctorSlots = new Set(['16:00', '16:30', '17:00', '17:30', '18:00', '18:30', '19:00', '19:30', '20:00']);
+    } else if (preset === 'fullday') {
+        _currentEditingDoctorSlots = new Set(['09:00', '09:30', '10:00', '10:30', '11:00', '11:30', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30']);
+    }
+    renderScheduleSlotPills();
+}
+
+function clearAllSlots() {
+    _currentEditingDoctorSlots.clear();
+    renderScheduleSlotPills();
+}
+
+function addCustomSlot() {
+    const input = document.getElementById('customSlotInput');
+    if (!input || !input.value) return;
+    _currentEditingDoctorSlots.add(input.value);
+    input.value = '';
+    renderScheduleSlotPills();
+}
+
+function submitDoctorSchedule(event) {
+    event.preventDefault();
+    const docId = document.getElementById('schedDocId').value;
+    const roomNumber = document.getElementById('schedRoomNumber').value.trim();
+    const maxDailyAppointments = parseInt(document.getElementById('schedMaxPatients').value, 10) || 30;
+    const slots = Array.from(_currentEditingDoctorSlots).sort();
+
+    if (!docId) return;
+
+    authFetch(`${API_BASE}/hospitals/${currentHospitalId}/doctors/${docId}/schedule`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            roomNumber,
+            maxDailyAppointments,
+            availableSlots: slots
+        })
+    })
+    .then(async r => {
+        if (!r.ok) {
+            const err = await r.text();
+            throw new Error(err || 'Failed to update doctor schedule');
+        }
+        return r.json();
+    })
+    .then(updatedDoc => {
+        closeDoctorScheduleModal();
+        alert(`🎉 Schedule updated successfully for ${updatedDoc.name} with ${slots.length} available slots!`);
+        handleLiveDoctorUpdate(updatedDoc);
+    })
+    .catch(err => {
+        console.error('Error updating doctor schedule:', err);
+        alert(err.message || 'Error updating doctor schedule.');
+    });
 }
 
 // BUG 37 FIX: Module-level state for the appointment detail modal

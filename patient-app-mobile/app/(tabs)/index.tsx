@@ -25,6 +25,8 @@ import {
 } from '../../utils/websocket';
 import { useRouter } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
+import { showLocalNotification } from '../../utils/pushNotifications';
+import { useLanguage } from '../../context/LanguageContext';
 
 interface Doctor {
   id: string;
@@ -32,31 +34,35 @@ interface Doctor {
   departmentId: string;
   departmentName: string;
   roomNumber: string;
-  status: string; // e.g. AVAILABLE, BUSY, AWAY
-  availableSlots: string[];
+  status: string;
+  availableSlots?: string[];
   averageRating?: number;
   totalRatings?: number;
+  availableSlotsCount?: number;
 }
 
 interface Department {
   id: string;
   name: string;
+  code?: string;
+  description?: string;
 }
 
 interface Appointment {
   id: string;
-  patientId: string;
+  patientId?: string;
   doctorId: string;
   doctorName: string;
   departmentName: string;
   appointmentDate: string;
   timeSlot: string;
   queueNumber: string;
-  status: 'BOOKED' | 'CHECKED_IN' | 'WAITING' | 'CALLED' | 'IN_CONSULTATION' | 'COMPLETED' | 'CANCELLED';
+  status: string;
 }
 
 export default function HomeScreen() {
   const { user, hospitalId, hospitalName, updateHospitalName, token } = useAuth();
+  const { t, language } = useLanguage();
   const router = useRouter();
   const isFocused = useIsFocused();
 
@@ -64,6 +70,7 @@ export default function HomeScreen() {
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [activeAppointment, setActiveAppointment] = useState<Appointment | null>(null);
+  const [allActiveAppointments, setAllActiveAppointments] = useState<Appointment[]>([]);
   
   // Real-time Queue details
   const [currentlyServing, setCurrentlyServing] = useState('--');
@@ -105,11 +112,11 @@ export default function HomeScreen() {
         setDoctors(docs || []);
       }
 
-      // 4. Fetch Active Appointment
+      // 4. Fetch Active Appointments
       const apptRes = await authFetch(`/hospitals/${hospitalId}/appointments?patientId=${user.userId}`);
       if (apptRes.ok) {
         const appts: Appointment[] = await apptRes.json();
-        const active = appts.find(
+        const activeList = (appts || []).filter(
           (a) =>
             a.status === 'BOOKED' ||
             a.status === 'CHECKED_IN' ||
@@ -117,20 +124,29 @@ export default function HomeScreen() {
             a.status === 'CALLED' ||
             a.status === 'IN_CONSULTATION'
         );
-        setActiveAppointment(active || null);
-        
-        if (!active) {
-          // Reset real-time fields
-          setCurrentlyServing('--');
-          setPeopleAhead('--');
-          setEstWaitTime('--');
-          setQueueBannerText('Select a doctor below to book an appointment');
-          setQueueBannerStyle('info');
-          unsubscribeFromQueue();
-        } else {
-          // Fetch static queue summary immediately
-          fetchStaticQueueSummary(active.doctorId);
-        }
+        setAllActiveAppointments(activeList);
+
+        // Keep current selected if still active, otherwise pick first
+        setActiveAppointment((prev) => {
+          if (prev && activeList.some((a) => a.id === prev.id)) {
+            const updated = activeList.find((a) => a.id === prev.id)!;
+            fetchStaticQueueSummary(updated.doctorId);
+            return updated;
+          }
+          const nextActive = activeList[0] || null;
+          if (nextActive) {
+            fetchStaticQueueSummary(nextActive.doctorId);
+          } else {
+            // Reset real-time fields
+            setCurrentlyServing('--');
+            setPeopleAhead('--');
+            setEstWaitTime('--');
+            setQueueBannerText('Select a doctor below to book an appointment');
+            setQueueBannerStyle('info');
+            unsubscribeFromQueue();
+          }
+          return nextActive;
+        });
       }
 
       // 5. Fetch Notification Unread Count
@@ -215,8 +231,15 @@ export default function HomeScreen() {
     const stompClient = connectWebSocket(token, () => {
       // Subscribe to unread notifications
       if (user?.userId) {
-        subscribeToNotifications(hospitalId, user.userId, () => {
+        subscribeToNotifications(hospitalId, user.userId, (notif) => {
           loadData();
+          if (notif && (notif.title || notif.message)) {
+            showLocalNotification(
+              notif.title || 'MediFlow Queue Alert',
+              notif.message || 'You have a new update.',
+              notif
+            );
+          }
         });
       }
 
@@ -331,7 +354,7 @@ export default function HomeScreen() {
             <Text style={styles.avatarText}>{getInitials(user?.name || '')}</Text>
           </View>
           <View>
-            <Text style={styles.greetingSub}>Welcome back,</Text>
+            <Text style={styles.greetingSub}>{t.welcomeBack}</Text>
             <Text style={styles.userName}>{user?.name || 'Patient'}</Text>
           </View>
         </View>
@@ -360,6 +383,60 @@ export default function HomeScreen() {
         contentContainerStyle={styles.scrollContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
+        {/* Multi-Active Appointments Switcher (when patient has booked 2+ doctors) */}
+        {allActiveAppointments.length > 1 && (
+          <View style={{ marginHorizontal: 16, marginBottom: 12 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <Text style={{ fontSize: 13, fontWeight: '700', color: '#38BDF8' }}>
+                {t.activeAppointmentsCount} ({allActiveAppointments.length})
+              </Text>
+              <TouchableOpacity onPress={() => router.navigate('/(tabs)/appointments')}>
+                <Text style={{ fontSize: 12, fontWeight: '600', color: '#94A3B8' }}>{t.viewAll}</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+              {allActiveAppointments.map((appt) => {
+                const isSelected = activeAppointment?.id === appt.id;
+                return (
+                  <TouchableOpacity
+                    key={appt.id}
+                    onPress={() => {
+                      setActiveAppointment(appt);
+                      fetchStaticQueueSummary(appt.doctorId);
+                    }}
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      backgroundColor: isSelected ? '#38BDF8' : 'rgba(255,255,255,0.06)',
+                      borderColor: isSelected ? '#38BDF8' : 'rgba(255,255,255,0.12)',
+                      borderWidth: 1,
+                      paddingVertical: 7,
+                      paddingHorizontal: 12,
+                      borderRadius: 20,
+                    }}
+                  >
+                    <Ionicons
+                      name="medkit"
+                      size={14}
+                      color={isSelected ? '#090D16' : '#38BDF8'}
+                      style={{ marginRight: 6 }}
+                    />
+                    <Text
+                      style={{
+                        fontSize: 13,
+                        fontWeight: '700',
+                        color: isSelected ? '#090D16' : '#F8FAFC',
+                      }}
+                    >
+                      {appt.doctorName} ({appt.queueNumber || appt.timeSlot})
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </ScrollView>
+          </View>
+        )}
+
         {/* Ticket card section */}
         <View style={styles.ticketSection}>
           <View style={styles.ticketCard}>
@@ -371,35 +448,35 @@ export default function HomeScreen() {
                 </Text>
               </View>
               <Text style={styles.roomTag}>
-                {activeAppointment ? `Room ${doctors.find(d => d.id === activeAppointment.doctorId)?.roomNumber || '302'}` : 'Room --'}
+                {activeAppointment ? `${t.room} ${doctors.find(d => d.id === activeAppointment.doctorId)?.roomNumber || '302'}` : `${t.room} --`}
               </Text>
             </View>
 
             <View style={styles.ticketBody}>
-              <Text style={styles.tokenLabel}>Your Queue Token</Text>
+              <Text style={styles.tokenLabel}>{t.yourQueueToken}</Text>
               <Text style={styles.tokenNumber}>
                 {activeAppointment ? activeAppointment.queueNumber : '--'}
               </Text>
               <Text style={styles.doctorName}>
                 {activeAppointment
                   ? `${activeAppointment.doctorName} (${activeAppointment.departmentName})`
-                  : 'No active booking'}
+                  : t.noActiveBooking}
               </Text>
 
               {/* Counters row */}
               <View style={styles.countersRow}>
                 <View style={styles.counterBox}>
-                  <Text style={styles.counterLabel}>Currently Serving</Text>
+                  <Text style={styles.counterLabel}>{t.currentlyServing}</Text>
                   <Text style={styles.counterValue}>{currentlyServing}</Text>
                 </View>
                 <View style={styles.divider} />
                 <View style={styles.counterBox}>
-                  <Text style={styles.counterLabel}>People Ahead</Text>
+                  <Text style={styles.counterLabel}>{t.peopleAhead}</Text>
                   <Text style={styles.counterValue}>{peopleAhead}</Text>
                 </View>
                 <View style={styles.divider} />
                 <View style={styles.counterBox}>
-                  <Text style={styles.counterLabel}>Est. Wait Time</Text>
+                  <Text style={styles.counterLabel}>{t.estWaitTime}</Text>
                   <Text style={styles.counterValue}>{estWaitTime}</Text>
                 </View>
               </View>
@@ -451,7 +528,7 @@ export default function HomeScreen() {
               <View style={styles.scheduleInfo}>
                 <Ionicons name="time-outline" size={14} color="#94A3B8" style={{ marginRight: 4 }} />
                 <Text style={styles.scheduleText} numberOfLines={1}>
-                  Scheduled:{' '}
+                  {t.scheduled}{' '}
                   {activeAppointment
                     ? `${activeAppointment.appointmentDate} ${activeAppointment.timeSlot}`
                     : 'None'}
@@ -464,7 +541,7 @@ export default function HomeScreen() {
                   onPress={handleCancelAppointment}
                 >
                   <Ionicons name="close-circle-outline" size={14} color="#F87171" style={{ marginRight: 4 }} />
-                  <Text style={styles.cancelBtnText}>Cancel</Text>
+                  <Text style={styles.cancelBtnText}>{t.cancel}</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -473,7 +550,7 @@ export default function HomeScreen() {
 
         {/* Quick action grid */}
         <View style={styles.sectionBlock}>
-          <Text style={styles.sectionTitle}>Quick Services</Text>
+          <Text style={styles.sectionTitle}>{t.quickServices}</Text>
           <View style={styles.quickGrid}>
             <TouchableOpacity
               style={styles.quickCard}
@@ -482,17 +559,17 @@ export default function HomeScreen() {
               <View style={[styles.iconCircle, styles.circleBlue]}>
                 <Ionicons name="calendar-outline" size={20} color="#38BDF8" />
               </View>
-              <Text style={styles.quickCardText}>Book Appointment</Text>
+              <Text style={styles.quickCardText}>{t.bookAppointment}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.quickCard}
-              onPress={() => router.push('/(tabs)/queue')}
+              onPress={() => router.navigate('/(tabs)/queue')}
             >
               <View style={[styles.iconCircle, styles.circleGreen]}>
                 <Ionicons name="people-outline" size={20} color="#34D399" />
               </View>
-              <Text style={styles.quickCardText}>Live Queue Tracker</Text>
+              <Text style={styles.quickCardText}>{t.liveQueueTracker}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -505,25 +582,25 @@ export default function HomeScreen() {
               <View style={[styles.iconCircle, styles.circlePurple]}>
                 <Ionicons name="grid-outline" size={20} color="#A855F7" />
               </View>
-              <Text style={styles.quickCardText}>Departments</Text>
+              <Text style={styles.quickCardText}>{t.departments}</Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.quickCard}
-              onPress={() => router.push('/(tabs)/appointments')}
+              onPress={() => router.navigate('/(tabs)/appointments')}
             >
               <View style={[styles.iconCircle, styles.circleOrange]}>
-                <Ionicons name="file-tray-full-outline" size={20} color="#FB923C" />
+                <Ionicons name="calendar" size={20} color="#FB923C" />
               </View>
-              <Text style={styles.quickCardText}>My Records</Text>
+              <Text style={styles.quickCardText}>{t.myAppointments}</Text>
             </TouchableOpacity>
           </View>
         </View>
 
         {/* Departments Filter Block */}
         <View style={styles.sectionBlock}>
-          <Text style={styles.sectionTitle}>Medical Departments</Text>
-          <Text style={styles.sectionSubtitle}>Tap a department to filter doctors below</Text>
+          <Text style={styles.sectionTitle}>{t.medicalDepartments}</Text>
+          <Text style={styles.sectionSubtitle}>{t.filterDoctorsSubtitle}</Text>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -534,7 +611,7 @@ export default function HomeScreen() {
               onPress={() => setSelectedDeptId(null)}
             >
               <Text style={[styles.pillText, selectedDeptId === null && styles.pillTextActive]}>
-                All Doctors
+                {t.allDoctors}
               </Text>
             </TouchableOpacity>
             {departments.map((dept) => (
@@ -554,7 +631,7 @@ export default function HomeScreen() {
         {/* Doctors block */}
         <View style={[styles.sectionBlock, { marginBottom: 30 }]}>
           <View style={styles.doctorsHeader}>
-            <Text style={styles.sectionTitle}>Available Doctors</Text>
+            <Text style={styles.sectionTitle}>{t.availableDoctors}</Text>
           </View>
 
           {/* Search bar */}
@@ -562,7 +639,7 @@ export default function HomeScreen() {
             <Ionicons name="search" size={18} color="#94A3B8" style={{ marginRight: 8 }} />
             <TextInput
               style={styles.searchInput}
-              placeholder="Search by doctor or specialty..."
+              placeholder={t.searchPlaceholder}
               placeholderTextColor="#64748B"
               value={searchQuery}
               onChangeText={setSearchQuery}

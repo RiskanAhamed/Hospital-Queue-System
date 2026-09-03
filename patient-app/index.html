@@ -58,6 +58,15 @@
             
             <!-- VIEW: Home -->
             <section id="view-home">
+                <!-- Multi-Active Appointments Switcher -->
+                <div id="multiApptSelector" style="display:none; margin: 0 16px 12px 16px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                        <span style="font-size:0.82rem; font-weight:700; color:var(--primary);" id="multiApptTitle">Active Appointments</span>
+                        <a href="#" onclick="switchNav('appointments')" style="font-size:0.78rem; font-weight:600; color:var(--text-muted); text-decoration:none;">View All ➔</a>
+                    </div>
+                    <div id="multiApptPills" style="display:flex; gap:8px; overflow-x:auto; padding-bottom:4px;"></div>
+                </div>
+
                 <!-- LIVE QUEUE TICKET CARD (Real-time STOMP WebSockets) -->
                 <section class="live-queue-hero">
                     <div class="ticket-card glass">
@@ -126,8 +135,8 @@
                             <span>Departments</span>
                         </div>
                         <div class="quick-card" onclick="switchNav('appointments')">
-                            <div class="icon-circle orange"><i data-lucide="history"></i></div>
-                            <span>My Records</span>
+                            <div class="icon-circle orange"><i data-lucide="calendar"></i></div>
+                            <span>My Appointments</span>
                         </div>
                     </div>
                 </section>
@@ -294,8 +303,13 @@
         <!-- Patient Auth Modal -->
         <div class="modal-overlay" id="patientAuthModal" style="display: none;">
             <div class="modal-content glass" style="max-width: 360px;">
-                <div class="modal-header">
-                    <h3 id="patientAuthTitle">Patient Sign In</h3>
+                <div class="modal-header" style="flex-direction:column; align-items:center; text-align:center; padding-bottom:8px; border-bottom:1px solid rgba(255,255,255,0.08);">
+                    <div style="width:52px; height:52px; border-radius:14px; background:linear-gradient(135deg, rgba(56,189,248,0.2), rgba(14,165,233,0.4)); display:flex; align-items:center; justify-content:center; margin-bottom:10px; border:1px solid rgba(56,189,248,0.4);">
+                        <i data-lucide="activity" style="width:28px; height:28px; color:var(--primary);"></i>
+                    </div>
+                    <h2 style="font-size:1.3rem; font-weight:800; margin:0; color:#fff;">Medi<span style="color:var(--primary);">Flow</span></h2>
+                    <p style="font-size:0.8rem; color:var(--text-muted); margin:4px 0 12px 0;">Hospital Queue & Appointment Portal</p>
+                    <h3 id="patientAuthTitle" style="font-size:1rem; font-weight:700; color:var(--text-main); margin:0;">Patient Sign In</h3>
                 </div>
                 <div class="modal-body">
                     <div id="patientAuthAlert" style="display:none; padding:8px 12px; background:rgba(248,113,113,0.15); color:#F87171; border-radius:8px; font-size:0.8rem; margin-bottom:12px;"></div>

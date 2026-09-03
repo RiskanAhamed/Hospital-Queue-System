@@ -30,6 +30,7 @@ public class Appointment {
     private Integer rating; // 1 to 5 stars
     private String feedbackComment;
     private LocalDateTime ratedAt;
+    private boolean reminderSent = false;
     private LocalDateTime createdAt = LocalDateTime.now();
 
     public Appointment(String id, String hospitalId, String patientId, String patientName, String doctorId, String doctorName, String departmentId, String departmentName, String appointmentDate, String timeSlot, String queueNumber, String status, LocalDateTime createdAt) {

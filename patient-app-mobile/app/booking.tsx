@@ -13,6 +13,7 @@ import { useAuth } from '../context/AuthContext';
 import { authFetch } from '../utils/api';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
+import { useLanguage } from '../context/LanguageContext';
 
 interface SlotResponse {
   timeSlot: string;
@@ -22,6 +23,7 @@ interface SlotResponse {
 
 export default function BookingScreen() {
   const { hospitalId } = useAuth();
+  const { t, language } = useLanguage();
   const router = useRouter();
   const params = useLocalSearchParams();
   const { doctorId, doctorName, specialty, roomNumber } = params;

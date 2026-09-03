@@ -28,6 +28,7 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeParseException;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/v1/hospitals/{hospitalId}/appointments")
@@ -57,14 +58,36 @@ public class AppointmentController {
         tenantSecurityService.validateTenantAccess(hospitalId);
         UserPrincipal currentUser = tenantSecurityService.getCurrentUser();
 
-        // BUG 19 FIX: PATIENT users can only see their own appointments
+        // 1. If filtering by doctorId (used for slot availability check during booking/rescheduling)
+        if (doctorId != null && !doctorId.trim().isEmpty()) {
+            List<Appointment> docAppts = appointmentRepository.findByHospitalIdAndDoctorId(hospitalId, doctorId.trim());
+            if ("PATIENT".equalsIgnoreCase(currentUser.getRole())) {
+                List<Appointment> sanitized = docAppts.stream().map(a -> {
+                    if (currentUser.getUserId().equals(a.getPatientId())) {
+                        return a;
+                    }
+                    Appointment slotInfo = new Appointment();
+                    slotInfo.setId(a.getId());
+                    slotInfo.setDoctorId(a.getDoctorId());
+                    slotInfo.setDoctorName(a.getDoctorName());
+                    slotInfo.setAppointmentDate(a.getAppointmentDate());
+                    slotInfo.setTimeSlot(a.getTimeSlot());
+                    slotInfo.setStatus(a.getStatus());
+                    return slotInfo;
+                }).collect(Collectors.toList());
+                return ResponseEntity.ok(sanitized);
+            }
+            return ResponseEntity.ok(docAppts);
+        }
+
+        // 2. BUG 19 FIX: PATIENT users can only see their own appointments when viewing their appointment history
         if ("PATIENT".equalsIgnoreCase(currentUser.getRole())) {
             return ResponseEntity.ok(
                 appointmentRepository.findByHospitalIdAndPatientId(hospitalId, currentUser.getUserId())
             );
         }
 
-        // Restrict DOCTOR users to seeing only their own appointments
+        // 3. Restrict DOCTOR users to seeing only their own appointments
         if ("DOCTOR".equalsIgnoreCase(currentUser.getRole())) {
             java.util.Optional<Doctor> docOpt = doctorRepository.findByUserId(currentUser.getUserId());
             if (docOpt.isPresent()) {
@@ -78,9 +101,6 @@ public class AppointmentController {
 
         if (patientId != null && !patientId.isEmpty()) {
             return ResponseEntity.ok(appointmentRepository.findByHospitalIdAndPatientId(hospitalId, patientId));
-        }
-        if (doctorId != null && !doctorId.isEmpty()) {
-            return ResponseEntity.ok(appointmentRepository.findByHospitalIdAndDoctorId(hospitalId, doctorId));
         }
         return ResponseEntity.ok(appointmentRepository.findByHospitalId(hospitalId));
     }

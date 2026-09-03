@@ -2,7 +2,9 @@ package com.hospital.queue;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
+@EnableScheduling
 @SpringBootApplication
 public class HospitalQueueApplication {
     public static void main(String[] args) {

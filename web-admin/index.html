@@ -1138,6 +1138,67 @@
         </div>
     </div>
 
+    <!-- Modal 8: Doctor Schedule & Time Slots Management -->
+    <div id="modalDoctorSchedule" class="modal-overlay">
+        <div class="modal-card" style="max-width: 600px;">
+            <div class="modal-header">
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <div style="width:40px; height:40px; border-radius:10px; background:rgba(56,189,248,0.15); display:flex; align-items:center; justify-content:center; color:var(--primary);">
+                        <i data-lucide="clock"></i>
+                    </div>
+                    <div>
+                        <h3 id="schedDocName" style="font-size:1.1rem; font-weight:700;">Doctor Schedule</h3>
+                        <p style="color:var(--text-muted); font-size:0.8rem; margin:0;">Configure consultation hours, room & time slots</p>
+                    </div>
+                </div>
+                <button class="close-btn" onclick="closeDoctorScheduleModal()">&times;</button>
+            </div>
+
+            <form id="formDoctorSchedule" onsubmit="submitDoctorSchedule(event)">
+                <input type="hidden" id="schedDocId">
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:16px;">
+                    <div class="form-group">
+                        <label style="font-size:0.82rem; font-weight:600; color:var(--text-muted); margin-bottom:6px; display:block;">Consultation Room</label>
+                        <input type="text" id="schedRoomNumber" class="form-control" placeholder="e.g. Room 302" required>
+                    </div>
+                    <div class="form-group">
+                        <label style="font-size:0.82rem; font-weight:600; color:var(--text-muted); margin-bottom:6px; display:block;">Max Patients / Day</label>
+                        <input type="number" id="schedMaxPatients" class="form-control" placeholder="30" min="1" max="200" required>
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-bottom:16px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:6px;">
+                        <label style="font-size:0.82rem; font-weight:600; color:var(--text-muted); margin:0;">Available Time Slots (<span id="selectedSlotsCount">0</span> selected)</label>
+                        <div style="display:flex; gap:6px;">
+                            <button type="button" class="btn btn-sm btn-ghost" onclick="applySlotPreset('morning')" style="font-size:0.75rem; padding:3px 8px;">Morning</button>
+                            <button type="button" class="btn btn-sm btn-ghost" onclick="applySlotPreset('evening')" style="font-size:0.75rem; padding:3px 8px;">Evening</button>
+                            <button type="button" class="btn btn-sm btn-ghost" onclick="applySlotPreset('fullday')" style="font-size:0.75rem; padding:3px 8px;">Full Day</button>
+                            <button type="button" class="btn btn-sm btn-ghost" onclick="clearAllSlots()" style="font-size:0.75rem; padding:3px 8px; color:#F87171;">Clear</button>
+                        </div>
+                    </div>
+                    <p style="font-size:0.75rem; color:var(--text-muted); margin-bottom:10px;">Toggle slots to enable or disable patient booking for this doctor:</p>
+                    <div id="slotsGridContainer" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(100px, 1fr)); gap:8px; max-height:220px; overflow-y:auto; padding:8px; background:rgba(0,0,0,0.25); border:1px solid var(--border-color); border-radius:10px;">
+                        <!-- Checkable slot pills -->
+                    </div>
+                </div>
+
+                <div class="form-group" style="margin-bottom:20px;">
+                    <label style="font-size:0.82rem; font-weight:600; color:var(--text-muted); margin-bottom:6px; display:block;">Add Custom Time Slot</label>
+                    <div style="display:flex; gap:8px;">
+                        <input type="time" id="customSlotInput" class="form-control" style="max-width:160px;">
+                        <button type="button" class="btn btn-secondary" onclick="addCustomSlot()"><i data-lucide="plus"></i> Add Slot</button>
+                    </div>
+                </div>
+
+                <div class="modal-footer" style="display:flex; justify-content:flex-end; gap:10px; border-top:1px solid var(--border-color); padding-top:16px;">
+                    <button type="button" class="btn btn-secondary" onclick="closeDoctorScheduleModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="btnSaveDoctorSchedule"><i data-lucide="check"></i> Save Schedule</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <!-- Scripts -->
     <script src="app.js"></script>
     <script>

@@ -60,14 +60,30 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
           body: JSON.stringify({ pushToken: token }),
         });
       }
+      return token;
     } else {
       console.log('Must use physical device for native Push Notifications');
+      return null;
     }
-
-    return token;
   } catch (error) {
     console.error('Error during push notification registration:', error);
     return null;
+  }
+}
+
+export async function showLocalNotification(title: string, body: string, data?: any) {
+  try {
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title,
+        body,
+        sound: 'default',
+        data: data || {},
+      },
+      trigger: null,
+    });
+  } catch (error) {
+    console.error('Error showing local notification:', error);
   }
 }
 
