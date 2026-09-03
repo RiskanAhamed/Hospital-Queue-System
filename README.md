@@ -2,6 +2,23 @@
 
 MediFlow is an enterprise-grade hospital queue management and appointment scheduling platform designed to eliminate physical waiting room congestion. The system provides seamless real-time queue synchronization, native push notifications, doctor consult management, and live tracking across mobile and web interfaces.
 
+[![Live Demo](https://img.shields.io/badge/Live_Demo-Online-0ea5e9?style=for-the-badge&logo=google-chrome&logoColor=white)](https://riskanahamed.github.io/Hospital-Queue-System/)
+[![Direct APK](https://img.shields.io/badge/Download_APK-Android_v1.0-10b981?style=for-the-badge&logo=android&logoColor=white)](https://github.com/RiskanAhamed/Hospital-Queue-System/raw/main/patient-app.apk)
+[![Java 17](https://img.shields.io/badge/Java-17-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)](https://openjdk.org/)
+[![Spring Boot 3](https://img.shields.io/badge/Spring_Boot-3.x-6DB33F?style=for-the-badge&logo=springboot&logoColor=white)](https://spring.io/)
+[![MongoDB](https://img.shields.io/badge/MongoDB-Atlas%20%2F%20Local-47A248?style=for-the-badge&logo=mongodb&logoColor=white)](https://www.mongodb.com/)
+[![React Native](https://img.shields.io/badge/React_Native-Expo_v54-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://expo.dev/)
+
+---
+
+## 🌐 Quick Access & Live Links
+
+| Resource | Link | Details |
+|---|---|---|
+| 🚀 **Live Web Portal & Demo** | [https://riskanahamed.github.io/Hospital-Queue-System/](https://riskanahamed.github.io/Hospital-Queue-System/) | Interactive Landing Page & Multi-Role Web Portals |
+| 📱 **Android Mobile App (APK)** | [Download `patient-app.apk`](https://github.com/RiskanAhamed/Hospital-Queue-System/raw/main/patient-app.apk) | Native React Native / Expo App with Push Notifications |
+| 📁 **GitHub Repository** | [Hospital-Queue-System](https://github.com/RiskanAhamed/Hospital-Queue-System) | Full Source Code (Backend, Web Portals, Mobile App) |
+
 ---
 
 ## 🌟 Key Features
