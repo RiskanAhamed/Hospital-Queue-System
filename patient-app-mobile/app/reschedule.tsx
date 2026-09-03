@@ -10,7 +10,7 @@ import {
   Platform,
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
-import { authFetch } from '../utils/api';
+import { authFetch, getErrorMessage } from '../utils/api';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useLanguage } from '../context/LanguageContext';
@@ -143,8 +143,8 @@ export default function RescheduleScreen() {
       });
 
       if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || 'Reschedule request failed.');
+        const errorMsg = await getErrorMessage(res, 'Reschedule request failed.');
+        throw new Error(errorMsg);
       }
 
       Alert.alert(

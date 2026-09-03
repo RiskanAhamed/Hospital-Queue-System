@@ -10,7 +10,7 @@ import {
   Platform,
 } from 'react-native';
 import { useAuth } from '../context/AuthContext';
-import { authFetch } from '../utils/api';
+import { authFetch, getErrorMessage } from '../utils/api';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useLanguage } from '../context/LanguageContext';
@@ -140,8 +140,8 @@ export default function BookingScreen() {
       });
 
       if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || 'Could not complete appointment booking.');
+        const errorMsg = await getErrorMessage(res, 'Could not complete appointment booking.');
+        throw new Error(errorMsg);
       }
 
       const savedAppt = await res.json();

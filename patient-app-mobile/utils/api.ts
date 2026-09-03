@@ -90,6 +90,27 @@ export async function authFetch(endpoint: string, options: RequestInit = {}): Pr
   return response;
 }
 
+export async function getErrorMessage(res: Response, defaultMsg: string = 'An error occurred'): Promise<string> {
+  try {
+    const text = await res.text();
+    if (!text) return defaultMsg;
+    try {
+      const parsed = JSON.parse(text);
+      if (typeof parsed === 'string') return parsed;
+      if (parsed.message) return parsed.message;
+      if (parsed.error) return parsed.error;
+      if (parsed.errors && Array.isArray(parsed.errors)) {
+        return parsed.errors.map((e: any) => e.defaultMessage || e.message || String(e)).join(', ');
+      }
+    } catch {
+      return text;
+    }
+    return text;
+  } catch {
+    return defaultMsg;
+  }
+}
+
 // Add global type declaration for custom unauthorized callback hook
 declare global {
   var onUnauthorized: (() => void) | undefined;

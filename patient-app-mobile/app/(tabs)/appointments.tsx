@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
-import { authFetch } from '../../utils/api';
+import { authFetch, getErrorMessage } from '../../utils/api';
 import { useRouter } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
 import { useLanguage } from '../../context/LanguageContext';
@@ -128,11 +128,11 @@ export default function AppointmentsScreen() {
                 Alert.alert('Success', 'Appointment cancelled.');
                 fetchAppointments();
               } else {
-                const text = await res.text();
-                Alert.alert('Failed', text || 'Could not cancel.');
+                const errorMsg = await getErrorMessage(res, 'Could not cancel appointment.');
+                Alert.alert('Failed', errorMsg);
               }
             } catch (e) {
-              Alert.alert('Error', 'Connection error.');
+              Alert.alert('Error', 'Network connection error.');
             }
           },
         },
@@ -167,8 +167,8 @@ export default function AppointmentsScreen() {
         setRatingModalVisible(false);
         fetchAppointments();
       } else {
-        const errText = await res.text();
-        Alert.alert('Error', errText || 'Failed to submit rating.');
+        const errText = await getErrorMessage(res, 'Failed to submit rating.');
+        Alert.alert('Error', errText);
       }
     } catch (e) {
       Alert.alert('Error', 'Network connection error.');
