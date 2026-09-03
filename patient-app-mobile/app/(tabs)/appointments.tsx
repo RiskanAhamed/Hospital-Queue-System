@@ -210,7 +210,7 @@ export default function AppointmentsScreen() {
         ) : (
           appointments.map((item) => {
             const sc = STATUS_COLORS[item.status] || { bg: 'rgba(255,255,255,0.06)', color: '#94A3B8' };
-            const canAction = item.status !== 'CANCELLED' && item.status !== 'COMPLETED';
+            const canAction = item.status === 'BOOKED' || item.status === 'CHECKED_IN' || item.status === 'WAITING';
 
             return (
               <View key={item.id} style={styles.apptCard}>

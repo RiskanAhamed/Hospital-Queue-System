@@ -55,15 +55,27 @@ export default function QueueScreen() {
       const res = await authFetch(`/hospitals/${hospitalId}/appointments?patientId=${user.userId}`);
       if (res.ok) {
         const appts: Appointment[] = await res.json();
-        const active = appts.find(
-          (a) =>
-            a.status === 'BOOKED' ||
-            a.status === 'CHECKED_IN' ||
-            a.status === 'WAITING' ||
-            a.status === 'CALLED' ||
-            a.status === 'IN_CONSULTATION'
-        );
-        setActiveAppointment(active || null);
+        const todayStr = new Date().toISOString().split('T')[0];
+        const active = (appts || [])
+          .filter(
+            (a) =>
+              (a.status === 'BOOKED' ||
+                a.status === 'CHECKED_IN' ||
+                a.status === 'WAITING' ||
+                a.status === 'CALLED' ||
+                a.status === 'IN_CONSULTATION') &&
+              a.appointmentDate >= todayStr
+          )
+          .sort((a, b) => {
+            if (a.appointmentDate === todayStr && b.appointmentDate !== todayStr) return -1;
+            if (b.appointmentDate === todayStr && a.appointmentDate !== todayStr) return 1;
+            return (
+              a.appointmentDate.localeCompare(b.appointmentDate) ||
+              (a.timeSlot || '').localeCompare(b.timeSlot || '')
+            );
+          })[0] || null;
+
+        setActiveAppointment(active);
 
         if (!active) {
           setCurrentlyServing('--');
@@ -96,11 +108,23 @@ export default function QueueScreen() {
 
     const activeAppt = active || activeAppointment;
     if (!activeAppt) return;
-    const myToken = activeAppt.queueNumber;
-    const entries = summary.entries || [];
-    const myEntry = entries.find((e: any) => e.queueNumber === myToken || e.id === activeAppt.id);
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const isToday = activeAppt.appointmentDate === todayStr;
 
     const roomName = `Room 302`; // Default or resolved from details
+
+    if (!isToday) {
+      setPeopleAhead('--');
+      setEstWaitTime('--');
+      setBannerStyle('info');
+      setBannerText(`📅 Scheduled for ${activeAppt.appointmentDate} at ${activeAppt.timeSlot || ''}`);
+      return;
+    }
+
+    const myToken = activeAppt.queueNumber;
+    const entries = summary.entries || [];
+    const myEntry = entries.find((e: any) => (myToken && e.queueNumber === myToken) || e.appointmentId === activeAppt.id || e.id === activeAppt.id);
 
     if (serving === myToken || (myEntry && (myEntry.status === 'CALLED' || myEntry.status === 'IN_CONSULTATION'))) {
       setPeopleAhead(0);
@@ -112,10 +136,10 @@ export default function QueueScreen() {
       setEstWaitTime('Done');
       setBannerStyle('completed');
       setBannerText('Consultation Completed. Thank you!');
-    } else {
+    } else if (myEntry && myEntry.status === 'WAITING') {
       const waitingEntries = entries.filter((e: any) => e.status === 'WAITING');
-      const myIndex = waitingEntries.findIndex((e: any) => e.queueNumber === myToken);
-      const aheadCount = myIndex >= 0 ? myIndex : waitingEntries.length;
+      const myIndex = waitingEntries.findIndex((e: any) => (myToken && e.queueNumber === myToken) || e.appointmentId === activeAppt.id || e.id === activeAppt.id);
+      const aheadCount = myIndex >= 0 ? myIndex : 0;
       const waitStr = aheadCount === 0 ? 'Next up!' : `${aheadCount * 10} mins`;
 
       let statusMsg = `Waiting in queue (${aheadCount} patient${aheadCount !== 1 ? 's' : ''} ahead)`;
@@ -131,6 +155,11 @@ export default function QueueScreen() {
       setEstWaitTime(waitStr);
       setBannerStyle('waiting');
       setBannerText(statusMsg);
+    } else {
+      setPeopleAhead(summary.waitingCount ?? '--');
+      setEstWaitTime(summary.waitingCount ? `${summary.waitingCount * 10} mins` : '--');
+      setBannerStyle('info');
+      setBannerText(`📅 Today at ${activeAppt.timeSlot || ''} (Token ${activeAppt.queueNumber || '--'})`);
     }
   }, [activeAppointment]);
 
