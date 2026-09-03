@@ -59,17 +59,29 @@ public class DashboardController {
                 .filter(a -> "CANCELLED".equalsIgnoreCase(a.getStatus()))
                 .count();
 
-        // 1. Calculate Real Average Wait Time in Minutes (from calledAt to completedAt)
+        // 1. Calculate Real Average Queue Wait Time (from createdAt to calledAt) & Consultation Duration
+        List<QueueEntry> calledEntries = queueEntries.stream()
+                .filter(q -> q.getCalledAt() != null && q.getCreatedAt() != null)
+                .collect(Collectors.toList());
+
+        long avgWaitMinutes = 0;
+        if (!calledEntries.isEmpty()) {
+            double totalWaitSecs = calledEntries.stream()
+                    .mapToDouble(q -> Math.max(0, Duration.between(q.getCreatedAt(), q.getCalledAt()).getSeconds()))
+                    .sum();
+            avgWaitMinutes = Math.max(1, Math.round(totalWaitSecs / calledEntries.size() / 60.0));
+        }
+
         List<QueueEntry> completedWithTimes = queueEntries.stream()
                 .filter(q -> "COMPLETED".equalsIgnoreCase(q.getStatus()) && q.getCalledAt() != null && q.getCompletedAt() != null)
                 .collect(Collectors.toList());
 
-        long avgWaitMinutes = 0;
+        long avgConsultationMinutes = 0;
         if (!completedWithTimes.isEmpty()) {
-            double totalWaitSecs = completedWithTimes.stream()
+            double totalConsultSecs = completedWithTimes.stream()
                     .mapToDouble(q -> Math.max(0, Duration.between(q.getCalledAt(), q.getCompletedAt()).getSeconds()))
                     .sum();
-            avgWaitMinutes = Math.max(1, Math.round(totalWaitSecs / completedWithTimes.size() / 60.0));
+            avgConsultationMinutes = Math.max(1, Math.round(totalConsultSecs / completedWithTimes.size() / 60.0));
         }
 
         // 2. Calculate Real Peak Hours (hour with maximum queue/appointment creations today)
@@ -118,6 +130,7 @@ public class DashboardController {
         stats.put("cancelledAppointments", cancelled);
         stats.put("activeDoctorsCount", doctors.stream().filter(Doctor::isAvailable).count());
         stats.put("avgWaitMinutes", avgWaitMinutes);
+        stats.put("avgConsultationMinutes", avgConsultationMinutes);
         stats.put("peakHours", peakHoursStr);
         stats.put("hourlyDistribution", hourlyDistribution);
 
