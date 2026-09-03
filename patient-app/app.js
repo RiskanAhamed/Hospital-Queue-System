@@ -332,14 +332,18 @@ function renderDoctorList(data) {
     }
 
     container.innerHTML = doctors.map(doc => {
-        const rating = doc.averageRating || 5.0;
-        const reviews = doc.totalRatings || 0;
+        const hasReviews = doc.totalRatings && doc.totalRatings > 0;
+        const ratingText = hasReviews ? `⭐ ${doc.averageRating.toFixed(1)} (${doc.totalRatings} ${doc.totalRatings === 1 ? 'review' : 'reviews'})` : `★ New Doctor`;
+        const ratingStyle = hasReviews 
+            ? 'background:rgba(251,191,36,0.15); color:#FBBF24;' 
+            : 'background:rgba(56,189,248,0.12); color:#38BDF8;';
+
         return `
             <div class="doctor-card-item">
                 <div class="doc-info">
                     <div style="display:flex; align-items:center; gap:8px;">
                         <h5>${escapeHtml(doc.name)}</h5>
-                        <span style="background:rgba(251,191,36,0.15); color:#FBBF24; padding:1px 6px; border-radius:8px; font-size:0.72rem; font-weight:700;">⭐ ${rating.toFixed(1)} ${reviews > 0 ? `(${reviews})` : ''}</span>
+                        <span style="${ratingStyle} padding:1px 6px; border-radius:8px; font-size:0.72rem; font-weight:700;">${ratingText}</span>
                     </div>
                     <p>${escapeHtml(doc.departmentName || 'General')} &bull; ${escapeHtml(doc.roomNumber || 'Room --')}</p>
                     <p style="color:var(--primary); font-size:0.75rem; margin-top:2px;">${escapeHtml(doc.specialization || 'Specialist')}</p>
