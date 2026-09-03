@@ -54,7 +54,8 @@ export const translations = {
     reschedule: 'Reschedule',
     rateConsultation: 'Rate Consultation',
     rateYourDoctor: 'Rate Your Doctor',
-    feedbackPlaceholder: 'Leave feedback about your consultation...',
+    commentsLabel: 'Comments & Review (Optional)',
+    feedbackPlaceholder: 'Share details of your consultation experience...',
     submitRating: 'Submit Rating',
     
     // Profile Tab
@@ -125,7 +126,8 @@ export const translations = {
     reschedule: 'நேரம் மாற்று',
     rateConsultation: 'மதிப்பீடு செய்',
     rateYourDoctor: 'மருத்துவருக்கு மதிப்பீடு',
-    feedbackPlaceholder: 'சந்திப்பு பற்றிய கருத்துக்களை பகிரவும்...',
+    commentsLabel: 'கருத்துகள் & விமர்சனம் (விருப்பப்பட்டால்)',
+    feedbackPlaceholder: 'சந்திப்பு பற்றிய கூடுதல் கருத்துக்களை பகிரவும்...',
     submitRating: 'மதிப்பீட்டை அனுப்பு',
     
     // Profile Tab

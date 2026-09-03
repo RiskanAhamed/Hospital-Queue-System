@@ -333,7 +333,7 @@ export default function AppointmentsScreen() {
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.7)', justifyContent: 'center', alignItems: 'center', padding: 20 }}>
           <View style={{ width: '100%', maxWidth: 360, backgroundColor: '#0F172A', borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1, borderRadius: 16, padding: 20 }}>
             <Text style={{ fontSize: 18, fontWeight: '800', color: '#F8FAFC', marginBottom: 4, textAlign: 'center' }}>
-              Rate Doctor
+              {t.rateYourDoctor}
             </Text>
             <Text style={{ fontSize: 13, color: '#94A3B8', marginBottom: 16, textAlign: 'center' }}>
               {selectedApptForRating?.doctorName} • {selectedApptForRating?.departmentName}
@@ -354,7 +354,7 @@ export default function AppointmentsScreen() {
 
             {/* Feedback text input */}
             <Text style={{ fontSize: 12, fontWeight: '600', color: '#94A3B8', marginBottom: 6 }}>
-              Comments & Review (Optional)
+              {t.commentsLabel}
             </Text>
             <TextInput
               style={{
@@ -369,7 +369,7 @@ export default function AppointmentsScreen() {
                 textAlignVertical: 'top',
                 marginBottom: 20,
               }}
-              placeholder="Share details of your consultation experience..."
+              placeholder={t.feedbackPlaceholder}
               placeholderTextColor="#64748B"
               multiline
               numberOfLines={3}
@@ -384,7 +384,7 @@ export default function AppointmentsScreen() {
                 onPress={() => setRatingModalVisible(false)}
                 disabled={submittingRating}
               >
-                <Text style={{ color: '#94A3B8', fontWeight: '600' }}>Cancel</Text>
+                <Text style={{ color: '#94A3B8', fontWeight: '600' }}>{t.cancel}</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -395,7 +395,7 @@ export default function AppointmentsScreen() {
                 {submittingRating ? (
                   <ActivityIndicator size="small" color="#090D16" />
                 ) : (
-                  <Text style={{ color: '#090D16', fontWeight: '700' }}>Submit Rating</Text>
+                  <Text style={{ color: '#090D16', fontWeight: '700' }}>{t.submitRating}</Text>
                 )}
               </TouchableOpacity>
             </View>
