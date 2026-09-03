@@ -89,12 +89,14 @@ public class NotificationController {
             targetUserId = currentUser.getUserId();
         }
 
-        List<Notification> unread = notificationRepository.findByHospitalIdAndUserIdOrderByCreatedAtDesc(hospitalId, targetUserId);
-        for (Notification n : unread) {
-            if (!n.isRead()) {
-                n.setRead(true);
-                notificationRepository.save(n);
-            }
+        List<Notification> unread = notificationRepository.findByHospitalIdAndUserIdOrderByCreatedAtDesc(hospitalId, targetUserId)
+                .stream()
+                .filter(n -> !n.isRead())
+                .peek(n -> n.setRead(true))
+                .collect(java.util.stream.Collectors.toList());
+
+        if (!unread.isEmpty()) {
+            notificationRepository.saveAll(unread);
         }
         return ResponseEntity.ok(Map.of("message", "All notifications marked as read"));
     }
