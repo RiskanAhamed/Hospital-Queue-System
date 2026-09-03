@@ -59,14 +59,19 @@ function authFetch(url, options = {}) {
     if (auth && auth.token) {
         headers['Authorization'] = `Bearer ${auth.token}`;
     }
-    return fetch(url, { ...options, headers }).then(response => {
-        if (response.status === 401) {
-            localStorage.removeItem(AUTH_KEY);
-            alert('Your session has expired. Please log in again.');
-            window.location.href = 'login.html';
-        }
-        return response;
-    });
+    return fetch(url, { ...options, headers })
+        .then(response => {
+            if (response.status === 401) {
+                localStorage.removeItem(AUTH_KEY);
+                alert('Your session has expired. Please log in again.');
+                window.location.href = 'login.html';
+            }
+            return response;
+        })
+        .catch(error => {
+            console.error('Network / API error:', url, error);
+            throw error;
+        });
 }
 
 /**
