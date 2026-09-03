@@ -6,9 +6,9 @@ global.TextEncoder = TextEncoder as any;
 global.TextDecoder = TextDecoder as any;
 
 import { DarkTheme, DefaultTheme, ThemeProvider } from '@react-navigation/native';
-import { Stack } from 'expo-router';
+import { Stack, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { ActivityIndicator, View, StyleSheet, Image, Text } from 'react-native';
+import { ActivityIndicator, View, StyleSheet, Image, Text, AppState } from 'react-native';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { AuthProvider, useAuth } from '../context/AuthContext';
 import LoginScreen from './login';
@@ -24,6 +24,7 @@ import React, { useEffect } from 'react';
 function AppContent() {
   const colorScheme = useColorScheme();
   const { token, loading } = useAuth();
+  const router = useRouter();
 
   useEffect(() => {
     if (token) {
@@ -32,12 +33,41 @@ function AppContent() {
         console.error('Push notification setup failed:', e)
       );
 
-      // Listen for notification taps
-      const subscription = Notifications.addNotificationResponseReceivedListener(response => {
-        console.log('User tapped on notification banner:', response.notification.request.content);
+      // Re-verify push registration when app comes from background to foreground
+      const appStateSub = AppState.addEventListener('change', (nextAppState) => {
+        if (nextAppState === 'active') {
+          registerForPushNotificationsAsync().catch(() => {});
+        }
       });
 
-      return () => subscription.remove();
+      // Listen for notification taps and navigate to the relevant screen (Deep Linking)
+      const subscription = Notifications.addNotificationResponseReceivedListener((response) => {
+        try {
+          const data = response.notification.request.content.data;
+          if (data && data.type) {
+            if (
+              data.type === 'RATE_DOCTOR' ||
+              data.type === 'APPOINTMENT_CONFIRMED' ||
+              data.type === 'APPOINTMENT_CANCELLED'
+            ) {
+              router.push('/(tabs)/appointments');
+            } else if (
+              data.type === 'QUEUE_TURN' ||
+              data.type === 'QUEUE_NEXT' ||
+              data.type === 'QUEUE_PROXIMITY_ALERT'
+            ) {
+              router.push('/(tabs)/queue');
+            }
+          }
+        } catch (err) {
+          console.error('Error handling notification tap navigation:', err);
+        }
+      });
+
+      return () => {
+        appStateSub.remove();
+        subscription.remove();
+      };
     }
   }, [token]);
 
