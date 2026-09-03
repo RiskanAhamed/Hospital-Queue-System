@@ -71,7 +71,13 @@ export const translations = {
     confirmNewPassword: 'Confirm New Password',
     updatePassword: 'Update Password',
     
-    // Alerts
+    // Alerts & Notifications Screen
+    notificationsTitle: 'Notifications',
+    recentAlerts: 'Recent alerts',
+    markAllRead: 'Mark all read',
+    noNotificationsTitle: 'No new notifications',
+    noNotificationsSub: 'You are all caught up!',
+    back: 'Back',
     langUpdated: 'Language Updated',
     langUpdatedMsg: 'App & Notification language set to English.',
     cancelConfirmTitle: 'Cancel Appointment',
@@ -143,7 +149,13 @@ export const translations = {
     confirmNewPassword: 'புதிய கடவுச்சொல்லை உறுதிசெய்',
     updatePassword: 'கடவுச்சொல்லை மாற்று',
     
-    // Alerts
+    // Alerts & Notifications Screen
+    notificationsTitle: 'அறிவிப்புகள்',
+    recentAlerts: 'சமீபத்திய அறிவிப்புகள்',
+    markAllRead: 'அனைத்தையும் படித்ததாகக் குறி',
+    noNotificationsTitle: 'புதிய அறிவிப்புகள் எதுவும் இல்லை',
+    noNotificationsSub: 'அனைத்து அறிவிப்புகளும் புதுப்பிக்கப்பட்டுள்ளன!',
+    back: 'பின்னே',
     langUpdated: 'மொழி மாற்றப்பட்டது',
     langUpdatedMsg: 'ஆப் மற்றும் அறிவிப்புகள் இனி தமிழில் வரும்.',
     cancelConfirmTitle: 'சந்திப்பை ரத்து செய்',

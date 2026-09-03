@@ -1027,9 +1027,10 @@ function closePatientNotificationsModal() {
 
 function fetchPatientUnreadNotificationsCount() {
     const auth = getPatientAuth();
-    if (!auth || !auth.userId) return;
+    const hospId = currentHospitalId || (auth && auth.hospitalId);
+    if (!hospId || !auth || !auth.userId) return;
 
-    authFetch(`${API_BASE}/hospitals/${currentHospitalId}/notifications/unread-count`)
+    authFetch(`${API_BASE}/hospitals/${hospId}/notifications/unread-count?userId=${encodeURIComponent(auth.userId)}`)
         .then(r => r.ok ? r.json() : { unreadCount: 0 })
         .then(data => {
             const dot = document.getElementById('patientBellDot');
@@ -1042,9 +1043,10 @@ function fetchPatientUnreadNotificationsCount() {
 
 function fetchPatientNotifications() {
     const auth = getPatientAuth();
-    if (!auth || !auth.userId) return;
+    const hospId = currentHospitalId || (auth && auth.hospitalId);
+    if (!hospId || !auth || !auth.userId) return;
 
-    authFetch(`${API_BASE}/hospitals/${currentHospitalId}/notifications`)
+    authFetch(`${API_BASE}/hospitals/${hospId}/notifications?userId=${encodeURIComponent(auth.userId)}`)
         .then(r => r.ok ? r.json() : [])
         .then(notifications => {
             renderPatientNotifications(notifications);

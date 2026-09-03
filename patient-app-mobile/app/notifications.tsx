@@ -15,6 +15,7 @@ import { useAuth } from '../context/AuthContext';
 import { authFetch } from '../utils/api';
 import { useRouter } from 'expo-router';
 import { connectWebSocket, subscribeToNotifications } from '../utils/websocket';
+import { useLanguage } from '../context/LanguageContext';
 
 interface NotificationItem {
   id: string;
@@ -25,6 +26,7 @@ interface NotificationItem {
 
 export default function NotificationsScreen() {
   const { hospitalId, user, token } = useAuth();
+  const { t } = useLanguage();
   const router = useRouter();
 
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
@@ -108,8 +110,12 @@ export default function NotificationsScreen() {
   const formatTime = (timeStr: string) => {
     try {
       if (!timeStr) return '';
-      const d = new Date(timeStr);
-      // Format to readable time, e.g. "Aug 31, 03:22 PM"
+      const d = new Date(timeStr.includes('Z') || timeStr.includes('+') ? timeStr : timeStr + 'Z');
+      if (isNaN(d.getTime())) {
+        const fallback = new Date(timeStr);
+        if (isNaN(fallback.getTime())) return timeStr;
+        d.setTime(fallback.getTime());
+      }
       const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
       const month = months[d.getMonth()];
       const day = d.getDate();
@@ -117,9 +123,9 @@ export default function NotificationsScreen() {
       const minutes = String(d.getMinutes()).padStart(2, '0');
       const ampm = hours >= 12 ? 'PM' : 'AM';
       hours = hours % 12;
-      hours = hours ? hours : 12; // the hour '0' should be '12'
+      hours = hours ? hours : 12;
       return `${month} ${day}, ${hours}:${minutes} ${ampm}`;
-    } catch (e) {
+    } catch {
       return timeStr;
     }
   };
@@ -138,18 +144,18 @@ export default function NotificationsScreen() {
       <View style={styles.header}>
         <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
           <Ionicons name="chevron-back" size={24} color="#38BDF8" />
-          <Text style={styles.backBtnText}>Back</Text>
+          <Text style={styles.backBtnText}>{t.back}</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Notifications</Text>
+        <Text style={styles.headerTitle}>{t.notificationsTitle}</Text>
         <View style={{ width: 60 }} />
       </View>
 
       {/* Subheader action */}
       <View style={styles.subHeader}>
-        <Text style={styles.subTitle}>Recent alerts</Text>
-        {notifications.some(n => !n.read) && (
+        <Text style={styles.subTitle}>{t.recentAlerts}</Text>
+        {notifications.some((n) => !n.read) && (
           <TouchableOpacity onPress={handleMarkAllRead}>
-            <Text style={styles.markReadText}>Mark all read</Text>
+            <Text style={styles.markReadText}>{t.markAllRead}</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -161,8 +167,8 @@ export default function NotificationsScreen() {
         {notifications.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Ionicons name="notifications-off-outline" size={60} color="#64748B" style={{ marginBottom: 12 }} />
-            <Text style={styles.emptyTitle}>No new notifications</Text>
-            <Text style={styles.emptySubtitle}>You are all caught up!</Text>
+            <Text style={styles.emptyTitle}>{t.noNotificationsTitle}</Text>
+            <Text style={styles.emptySubtitle}>{t.noNotificationsSub}</Text>
           </View>
         ) : (
           notifications.map((item) => (
