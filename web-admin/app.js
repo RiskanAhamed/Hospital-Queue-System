@@ -2301,5 +2301,60 @@ function exportExecutivePDFReport() {
     printWindow.document.close();
 }
 
+// --- Admin / Staff Change Password Modal Handlers ---
+function openAdminChangePasswordModal() {
+    document.getElementById('adminCurrentPass').value = '';
+    document.getElementById('adminNewPass').value = '';
+    document.getElementById('adminConfirmPass').value = '';
+    const modal = document.getElementById('modalAdminChangePassword');
+    if (modal) modal.classList.add('active');
+}
+
+function closeAdminChangePasswordModal() {
+    const modal = document.getElementById('modalAdminChangePassword');
+    if (modal) modal.classList.remove('active');
+}
+
+async function submitAdminChangePassword(event) {
+    event.preventDefault();
+    const currentPassword = document.getElementById('adminCurrentPass').value.trim();
+    const newPassword = document.getElementById('adminNewPass').value.trim();
+    const confirmPassword = document.getElementById('adminConfirmPass').value.trim();
+
+    if (!currentPassword || !newPassword) {
+        alert('Please enter both current and new passwords.');
+        return;
+    }
+
+    if (newPassword.length < 6) {
+        alert('New password must be at least 6 characters long.');
+        return;
+    }
+
+    if (newPassword !== confirmPassword) {
+        alert('New password and confirmation do not match.');
+        return;
+    }
+
+    try {
+        const res = await authFetch(`${API_BASE}/auth/change-password`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ currentPassword, newPassword })
+        });
+
+        if (res.ok) {
+            closeAdminChangePasswordModal();
+            alert('🎉 Password changed successfully!');
+        } else {
+            const err = await res.text();
+            alert(err || 'Failed to change password. Please verify your current password.');
+        }
+    } catch (err) {
+        console.error('Error changing password:', err);
+        alert('Connection error. Please try again.');
+    }
+}
+
 
 

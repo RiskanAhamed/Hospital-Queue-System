@@ -1257,3 +1257,57 @@ window.addEventListener('DOMContentLoaded', () => {
     }
 });
 
+// Patient In-App Change Password Logic
+function openPatientChangePasswordModal() {
+    document.getElementById('patientCurrentPass').value = '';
+    document.getElementById('patientNewPass').value = '';
+    document.getElementById('patientConfirmPass').value = '';
+    const modal = document.getElementById('patientChangePasswordModal');
+    if (modal) modal.style.display = 'flex';
+}
+
+function closePatientChangePasswordModal() {
+    const modal = document.getElementById('patientChangePasswordModal');
+    if (modal) modal.style.display = 'none';
+}
+
+async function submitPatientChangePassword() {
+    const currentPassword = document.getElementById('patientCurrentPass').value.trim();
+    const newPassword = document.getElementById('patientNewPass').value.trim();
+    const confirmPassword = document.getElementById('patientConfirmPass').value.trim();
+
+    if (!currentPassword || !newPassword) {
+        alert('Please enter both current and new password.');
+        return;
+    }
+
+    if (newPassword.length < 6) {
+        alert('New password must be at least 6 characters long.');
+        return;
+    }
+
+    if (newPassword !== confirmPassword) {
+        alert('New password and confirmation do not match.');
+        return;
+    }
+
+    try {
+        const res = await authFetch('/auth/change-password', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ currentPassword, newPassword })
+        });
+
+        if (res.ok) {
+            closePatientChangePasswordModal();
+            alert('🎉 Password changed successfully!');
+        } else {
+            const err = await res.text();
+            alert(err || 'Failed to change password. Please check your current password.');
+        }
+    } catch (e) {
+        console.error('Error changing password:', e);
+        alert('Network error. Please try again.');
+    }
+}
+

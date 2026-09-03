@@ -232,6 +232,13 @@
                             <option value="en">🇬🇧 English</option>
                         </select>
                     </div>
+                    <div style="background:rgba(255,255,255,0.04); border:1px solid var(--border-color); border-radius:12px; padding:14px 16px; display:flex; justify-content:space-between; align-items:center; cursor:pointer;" onclick="openPatientChangePasswordModal()">
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <i data-lucide="key" style="width:16px; height:16px; color:var(--primary);"></i>
+                            <span style="font-size:0.85rem; font-weight:600; color:#F8FAFC;">Change Password (கடவுச்சொல் மாற்றம்)</span>
+                        </div>
+                        <i data-lucide="chevron-right" style="width:16px; height:16px; color:var(--text-muted);"></i>
+                    </div>
                 </div>
                 <button onclick="patientLogout()" style="width:100%; margin-top:24px; padding:14px; background:rgba(248,113,113,0.1); border:1px solid rgba(248,113,113,0.3); color:#F87171; border-radius:12px; font-family:var(--font); font-size:0.9rem; font-weight:700; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px;">
                     <i data-lucide="log-out"></i> Sign Out
@@ -473,7 +480,27 @@
                         <label>Review & Feedback (Optional)</label>
                         <textarea id="ratingFeedbackComment" placeholder="Share details of your consultation experience..." style="width:100%; height:70px; padding:10px; border-radius:8px; border:1px solid rgba(255,255,255,0.1); background:rgba(0,0,0,0.3); color:#fff; font-family:var(--font); resize:none;"></textarea>
                     </div>
-                    <button type="button" class="btn btn-primary btn-block" onclick="submitPatientRating()">Submit Rating</button>
+        <!-- Patient Change Password Modal -->
+        <div class="modal-overlay" id="patientChangePasswordModal" style="display: none;">
+            <div class="modal-content glass" style="max-width: 360px;">
+                <div class="modal-header">
+                    <h3>Change Password 🔑</h3>
+                    <button class="close-btn" onclick="closePatientChangePasswordModal()">&times;</button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>Current Password</label>
+                        <input type="password" id="patientCurrentPass" placeholder="Enter current password" class="form-control" style="width:100%; padding:10px; border-radius:8px; border:1px solid rgba(255,255,255,0.1); background:rgba(0,0,0,0.3); color:#fff; font-family:var(--font);">
+                    </div>
+                    <div class="form-group">
+                        <label>New Password</label>
+                        <input type="password" id="patientNewPass" placeholder="At least 6 characters" class="form-control" style="width:100%; padding:10px; border-radius:8px; border:1px solid rgba(255,255,255,0.1); background:rgba(0,0,0,0.3); color:#fff; font-family:var(--font);">
+                    </div>
+                    <div class="form-group">
+                        <label>Confirm New Password</label>
+                        <input type="password" id="patientConfirmPass" placeholder="Re-enter new password" class="form-control" style="width:100%; padding:10px; border-radius:8px; border:1px solid rgba(255,255,255,0.1); background:rgba(0,0,0,0.3); color:#fff; font-family:var(--font);">
+                    </div>
+                    <button type="button" class="btn btn-primary btn-block" onclick="submitPatientChangePassword()">Update Password</button>
                 </div>
             </div>
         </div>
