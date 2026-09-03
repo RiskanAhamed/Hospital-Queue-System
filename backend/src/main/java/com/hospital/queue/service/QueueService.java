@@ -164,6 +164,13 @@ public class QueueService {
             queue.setCalledAt(LocalDateTime.now());
             QueueEntry updated = queueRepository.save(queue);
 
+            if (queue.getAppointmentId() != null) {
+                appointmentRepository.findById(queue.getAppointmentId()).ifPresent(appt -> {
+                    appt.setStatus("CALLED");
+                    appointmentRepository.save(appt);
+                });
+            }
+
             // Notify the called patient "It's your turn"
             String roomNum = docOpt.map(Doctor::getRoomNumber).orElse("TBD");
             String doctorName = docOpt.map(Doctor::getName).orElse("your doctor");
@@ -332,6 +339,13 @@ public class QueueService {
             entry.setStatus("SKIPPED");
             QueueEntry saved = queueRepository.save(entry);
 
+            if (saved.getAppointmentId() != null) {
+                appointmentRepository.findById(saved.getAppointmentId()).ifPresent(appt -> {
+                    appt.setStatus("SKIPPED");
+                    appointmentRepository.save(appt);
+                });
+            }
+
             broadcastQueueState(saved.getHospitalId(), saved.getDoctorId());
             return saved;
         }
@@ -352,6 +366,13 @@ public class QueueService {
             entry.setStatus("CALLED");
             entry.setCalledAt(LocalDateTime.now());
             QueueEntry saved = queueRepository.save(entry);
+
+            if (saved.getAppointmentId() != null) {
+                appointmentRepository.findById(saved.getAppointmentId()).ifPresent(appt -> {
+                    appt.setStatus("CALLED");
+                    appointmentRepository.save(appt);
+                });
+            }
 
             broadcastQueueState(saved.getHospitalId(), saved.getDoctorId());
             return saved;
