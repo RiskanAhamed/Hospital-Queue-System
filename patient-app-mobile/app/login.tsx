@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
-import { API_BASE } from '../utils/api';
+import { API_BASE, getErrorMessage } from '../utils/api';
 
 export default function LoginScreen() {
   const { login } = useAuth();
@@ -63,11 +63,12 @@ export default function LoginScreen() {
       });
 
       if (!res.ok) {
-        const text = await res.text();
         if (res.status === 429) {
+          const text = await res.text();
           throw new Error(`🚫 LOCKED OUT: ${text}`);
         }
-        throw new Error(text || 'Invalid email or password.');
+        const errorMsg = await getErrorMessage(res, 'Invalid email or password.');
+        throw new Error(errorMsg);
       }
 
       const data = await res.json();
@@ -105,8 +106,8 @@ export default function LoginScreen() {
       });
 
       if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || 'Registration failed.');
+        const errorMsg = await getErrorMessage(res, 'Registration failed.');
+        throw new Error(errorMsg);
       }
 
       const data = await res.json();
@@ -134,7 +135,7 @@ export default function LoginScreen() {
       const res = await fetch(`${API_BASE}/auth/forgot-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: forgotEmail.trim() }),
+        body: JSON.stringify({ email: forgotEmail.trim().toLowerCase() }),
       });
       if (res.ok) {
         const data = await res.json();
@@ -148,8 +149,8 @@ export default function LoginScreen() {
         setIsForgot(false);
         setIsReset(true);
       } else {
-        const text = await res.text();
-        throw new Error(text || 'Forgot password request failed.');
+        const errorMsg = await getErrorMessage(res, 'Forgot password request failed.');
+        throw new Error(errorMsg);
       }
     } catch (err: any) {
       console.error('FULL FORGOT PASSWORD ERROR OBJECT:', err);
@@ -164,6 +165,10 @@ export default function LoginScreen() {
       setErrorMessage('Please fill in all fields.');
       return;
     }
+    if (newPassword.length < 6) {
+      setErrorMessage('New password must be at least 6 characters.');
+      return;
+    }
     setResetLoading(true);
     setErrorMessage(null);
     setSuccessMessage(null);
@@ -174,12 +179,15 @@ export default function LoginScreen() {
         body: JSON.stringify({ token: resetToken.trim(), password: newPassword }),
       });
       if (res.ok) {
-        setSuccessMessage('Password reset successfully! Please sign in.');
+        setSuccessMessage('Password reset successfully! Please sign in with your new password.');
         setIsReset(false);
+        if (forgotEmail) {
+          setEmail(forgotEmail.trim().toLowerCase());
+        }
         setPassword('');
       } else {
-        const text = await res.text();
-        throw new Error(text || 'Password reset failed.');
+        const errorMsg = await getErrorMessage(res, 'Password reset failed.');
+        throw new Error(errorMsg);
       }
     } catch (err: any) {
       console.error('FULL RESET PASSWORD ERROR OBJECT:', err);
