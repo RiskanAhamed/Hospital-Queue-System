@@ -27,7 +27,7 @@ export function connectWebSocket(
   }
 
   stompClient = new Client({
-    webSocketFactory: () => new WebSocket('wss://hospital-queue-system-production.up.railway.app/ws-queue'),
+    webSocketFactory: () => new WebSocket(WS_BASE),
     connectHeaders: {
       Authorization: `Bearer ${token}`,
     },

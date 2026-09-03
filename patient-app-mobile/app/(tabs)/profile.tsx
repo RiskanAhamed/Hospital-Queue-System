@@ -28,6 +28,9 @@ export default function ProfileScreen() {
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showCurrentPwd, setShowCurrentPwd] = useState(false);
+  const [showNewPwd, setShowNewPwd] = useState(false);
+  const [showConfirmPwd, setShowConfirmPwd] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
   const [pwdError, setPwdError] = useState<string | null>(null);
 
@@ -235,38 +238,74 @@ export default function ProfileScreen() {
 
             <View style={styles.formGroup}>
               <Text style={styles.formLabel}>Current Password</Text>
-              <TextInput
-                style={styles.modalInput}
-                placeholder="Enter current password"
-                placeholderTextColor="#64748B"
-                secureTextEntry
-                value={currentPassword}
-                onChangeText={setCurrentPassword}
-              />
+              <View style={styles.passwordContainer}>
+                <TextInput
+                  style={[styles.modalInput, { paddingRight: 44 }]}
+                  placeholder="Enter current password"
+                  placeholderTextColor="#64748B"
+                  secureTextEntry={!showCurrentPwd}
+                  value={currentPassword}
+                  onChangeText={setCurrentPassword}
+                />
+                <TouchableOpacity
+                  style={styles.eyeBtn}
+                  onPress={() => setShowCurrentPwd((prev) => !prev)}
+                >
+                  <Ionicons
+                    name={showCurrentPwd ? 'eye-off-outline' : 'eye-outline'}
+                    size={20}
+                    color="#94A3B8"
+                  />
+                </TouchableOpacity>
+              </View>
             </View>
 
             <View style={styles.formGroup}>
               <Text style={styles.formLabel}>New Password (min. 6 characters)</Text>
-              <TextInput
-                style={styles.modalInput}
-                placeholder="Enter new password"
-                placeholderTextColor="#64748B"
-                secureTextEntry
-                value={newPassword}
-                onChangeText={setNewPassword}
-              />
+              <View style={styles.passwordContainer}>
+                <TextInput
+                  style={[styles.modalInput, { paddingRight: 44 }]}
+                  placeholder="Enter new password"
+                  placeholderTextColor="#64748B"
+                  secureTextEntry={!showNewPwd}
+                  value={newPassword}
+                  onChangeText={setNewPassword}
+                />
+                <TouchableOpacity
+                  style={styles.eyeBtn}
+                  onPress={() => setShowNewPwd((prev) => !prev)}
+                >
+                  <Ionicons
+                    name={showNewPwd ? 'eye-off-outline' : 'eye-outline'}
+                    size={20}
+                    color="#94A3B8"
+                  />
+                </TouchableOpacity>
+              </View>
             </View>
 
             <View style={styles.formGroup}>
               <Text style={styles.formLabel}>Confirm New Password</Text>
-              <TextInput
-                style={styles.modalInput}
-                placeholder="Re-enter new password"
-                placeholderTextColor="#64748B"
-                secureTextEntry
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-              />
+              <View style={styles.passwordContainer}>
+                <TextInput
+                  style={[styles.modalInput, { paddingRight: 44 }]}
+                  placeholder="Re-enter new password"
+                  placeholderTextColor="#64748B"
+                  secureTextEntry={!showConfirmPwd}
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                />
+                <TouchableOpacity
+                  style={styles.eyeBtn}
+                  onPress={() => setShowConfirmPwd((prev) => !prev)}
+                >
+                  <Ionicons
+                    name={showConfirmPwd ? 'eye-off-outline' : 'eye-outline'}
+                    size={20}
+                    color="#94A3B8"
+                  />
+                </TouchableOpacity>
+              </View>
             </View>
 
             <TouchableOpacity
@@ -473,5 +512,17 @@ const styles = StyleSheet.create({
     color: '#090D16',
     fontWeight: '700',
     fontSize: 14,
+  },
+  passwordContainer: {
+    position: 'relative',
+    justifyContent: 'center',
+  },
+  eyeBtn: {
+    position: 'absolute',
+    right: 12,
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
   },
 });

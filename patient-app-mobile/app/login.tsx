@@ -11,6 +11,7 @@ import {
   Platform,
   Image,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE } from '../utils/api';
 
@@ -19,6 +20,7 @@ export default function LoginScreen() {
   const [isRegister, setIsRegister] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [name, setName] = useState('');
   const [hospitalCode, setHospitalCode] = useState('');
   const [loading, setLoading] = useState(false);
@@ -34,6 +36,7 @@ export default function LoginScreen() {
   const [isReset, setIsReset] = useState(false);
   const [resetToken, setResetToken] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [showResetPassword, setShowResetPassword] = useState(false);
   const [resetLoading, setResetLoading] = useState(false);
 
   const handleDemoLogin = () => {
@@ -282,15 +285,27 @@ export default function LoginScreen() {
               </View>
               <View style={styles.formGroup}>
                 <Text style={styles.label}>New Password</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Min 6 characters"
-                  placeholderTextColor="#64748B"
-                  secureTextEntry
-                  value={newPassword}
-                  onChangeText={setNewPassword}
-                  autoCapitalize="none"
-                />
+                <View style={styles.passwordContainer}>
+                  <TextInput
+                    style={[styles.input, { paddingRight: 44 }]}
+                    placeholder="Min 6 characters"
+                    placeholderTextColor="#64748B"
+                    secureTextEntry={!showResetPassword}
+                    value={newPassword}
+                    onChangeText={setNewPassword}
+                    autoCapitalize="none"
+                  />
+                  <TouchableOpacity
+                    style={styles.eyeBtn}
+                    onPress={() => setShowResetPassword((prev) => !prev)}
+                  >
+                    <Ionicons
+                      name={showResetPassword ? 'eye-off-outline' : 'eye-outline'}
+                      size={20}
+                      color="#94A3B8"
+                    />
+                  </TouchableOpacity>
+                </View>
               </View>
               <TouchableOpacity
                 style={styles.btnPrimary}
@@ -331,15 +346,27 @@ export default function LoginScreen() {
 
               <View style={styles.formGroup}>
                 <Text style={styles.label}>Password</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Enter password"
-                  placeholderTextColor="#64748B"
-                  secureTextEntry
-                  value={password}
-                  onChangeText={setPassword}
-                  autoCapitalize="none"
-                />
+                <View style={styles.passwordContainer}>
+                  <TextInput
+                    style={[styles.input, { paddingRight: 44 }]}
+                    placeholder="Enter password"
+                    placeholderTextColor="#64748B"
+                    secureTextEntry={!showPassword}
+                    value={password}
+                    onChangeText={setPassword}
+                    autoCapitalize="none"
+                  />
+                  <TouchableOpacity
+                    style={styles.eyeBtn}
+                    onPress={() => setShowPassword((prev) => !prev)}
+                  >
+                    <Ionicons
+                      name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                      size={20}
+                      color="#94A3B8"
+                    />
+                  </TouchableOpacity>
+                </View>
               </View>
 
               <TouchableOpacity
@@ -392,15 +419,27 @@ export default function LoginScreen() {
 
               <View style={styles.formGroup}>
                 <Text style={styles.label}>Password</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Create password"
-                  placeholderTextColor="#64748B"
-                  secureTextEntry
-                  value={password}
-                  onChangeText={setPassword}
-                  autoCapitalize="none"
-                />
+                <View style={styles.passwordContainer}>
+                  <TextInput
+                    style={[styles.input, { paddingRight: 44 }]}
+                    placeholder="Create password"
+                    placeholderTextColor="#64748B"
+                    secureTextEntry={!showPassword}
+                    value={password}
+                    onChangeText={setPassword}
+                    autoCapitalize="none"
+                  />
+                  <TouchableOpacity
+                    style={styles.eyeBtn}
+                    onPress={() => setShowPassword((prev) => !prev)}
+                  >
+                    <Ionicons
+                      name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                      size={20}
+                      color="#94A3B8"
+                    />
+                  </TouchableOpacity>
+                </View>
               </View>
 
               <View style={styles.formGroup}>
@@ -590,8 +629,20 @@ const styles = StyleSheet.create({
   },
   linkText: {
     color: '#38BDF8',
-    fontWeight: '600',
     fontSize: 13,
+    fontWeight: '600',
+  },
+  passwordContainer: {
+    position: 'relative',
+    justifyContent: 'center',
+  },
+  eyeBtn: {
+    position: 'absolute',
+    right: 12,
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 4,
   },
   demoBlock: {
     marginTop: 20,

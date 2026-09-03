@@ -1,7 +1,7 @@
 import { getSecureItem, STORAGE_KEYS, clearAuthStorage } from './storage';
 
 export const API_BASE = 'https://hospital-queue-system-production.up.railway.app/api/v1';
-export const WS_BASE = 'wss://hospital-queue-system-production.up.railway.app/ws-queue/websocket';
+export const WS_BASE = 'wss://hospital-queue-system-production.up.railway.app/ws-queue';
 
 // Base64URL decoder for JWT parsing in React Native
 export function decodeJwt(token: string): any {

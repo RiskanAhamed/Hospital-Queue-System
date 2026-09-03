@@ -728,7 +728,9 @@ export default function HomeScreen() {
                   <View style={styles.docDetailCell}>
                     <Ionicons name="star" size={13} color="#FBBF24" style={{ marginRight: 3 }} />
                     <Text style={{ color: '#FBBF24', fontSize: 12, fontWeight: '700' }}>
-                      {(doc.averageRating || 5.0).toFixed(1)} {doc.totalRatings ? `(${doc.totalRatings})` : ''}
+                      {doc.totalRatings && doc.totalRatings > 0
+                        ? `${(doc.averageRating || 5.0).toFixed(1)} (${doc.totalRatings})`
+                        : '★ New'}
                     </Text>
                   </View>
                   <View style={styles.docDetailCell}>

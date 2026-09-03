@@ -14,6 +14,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../context/AuthContext';
 import { authFetch } from '../utils/api';
 import { useRouter } from 'expo-router';
+import { connectWebSocket, subscribeToNotifications } from '../utils/websocket';
 
 interface NotificationItem {
   id: string;
@@ -23,7 +24,7 @@ interface NotificationItem {
 }
 
 export default function NotificationsScreen() {
-  const { hospitalId, user } = useAuth();
+  const { hospitalId, user, token } = useAuth();
   const router = useRouter();
 
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
@@ -56,7 +57,15 @@ export default function NotificationsScreen() {
 
   useEffect(() => {
     fetchNotifications();
-  }, [fetchNotifications]);
+
+    if (token && hospitalId && user?.userId) {
+      connectWebSocket(token, () => {
+        subscribeToNotifications(hospitalId, user.userId, () => {
+          fetchNotifications();
+        });
+      });
+    }
+  }, [fetchNotifications, token, hospitalId, user?.userId]);
 
   const onRefresh = () => {
     setRefreshing(true);
