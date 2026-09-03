@@ -14,6 +14,7 @@ Thumbs.db
 
 # Mobile build artifacts
 *.apk
+!patient-app.apk
 *.aab
 
 # Node dependencies
