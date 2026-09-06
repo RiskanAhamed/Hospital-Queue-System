@@ -14,6 +14,7 @@ import { authFetch, getErrorMessage } from '../utils/api';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useLanguage } from '../context/LanguageContext';
+import { formatRoomDisplay } from '../utils/format';
 
 interface SlotResponse {
   timeSlot: string;
@@ -155,7 +156,7 @@ export default function BookingScreen() {
       const savedAppt = await res.json();
       Alert.alert(
         '🎉 Booking Confirmed',
-        `Doctor: ${savedAppt.doctorName}\nRoom: ${roomNumber || '302'}\nToken Number: ${savedAppt.queueNumber}\nTime: ${selectedDate} at ${formatSlotTime(selectedSlot)}`,
+        `Doctor: ${savedAppt.doctorName}\n${formatRoomDisplay(typeof roomNumber === 'string' ? roomNumber : '302', t.room || 'Room')}\nToken Number: ${savedAppt.queueNumber}\nTime: ${selectedDate} at ${formatSlotTime(selectedSlot)}`,
         [
           {
             text: 'OK',
@@ -190,7 +191,7 @@ export default function BookingScreen() {
           <Text style={styles.summaryTitle}>Consulting Doctor</Text>
           <Text style={styles.docName}>{doctorName || 'Doctor'}</Text>
           <Text style={styles.docSpecialty}>
-            {specialty || 'General Medicine'} &bull; Room {roomNumber || '302'}
+            {specialty || 'General Medicine'} &bull; {formatRoomDisplay(typeof roomNumber === 'string' ? roomNumber : '302', t.room || 'Room')}
           </Text>
         </View>
 

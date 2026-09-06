@@ -189,6 +189,25 @@ public class QueueService {
                     turnMsg
             );
 
+            // Send Real-time Queue Turn Email
+            try {
+                userRepository.findById(updated.getPatientId()).ifPresent(u -> {
+                    if (u.getEmail() != null && !u.getEmail().trim().isEmpty()) {
+                        String hospName = hospitalRepository.findById(hospitalId).map(com.hospital.queue.model.Hospital::getName).orElse("MediFlow Hospital");
+                        emailService.sendQueueTurnEmail(
+                                u.getEmail(),
+                                u.getName(),
+                                doctorName,
+                                roomNum,
+                                updated.getQueueNumber(),
+                                hospName
+                        );
+                    }
+                });
+            } catch (Exception e) {
+                // Non-blocking email error
+            }
+
             // Fetch upcoming waiting patients for proximity alerts
             List<QueueEntry> waitingList = queueRepository.findByHospitalIdAndDoctorIdAndQueueDateAndStatusOrderBySequenceNumberAsc(hospitalId, doctorId, today, "WAITING");
             if (waitingList.isEmpty()) {

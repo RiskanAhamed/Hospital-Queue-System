@@ -27,6 +27,7 @@ import { useRouter } from 'expo-router';
 import { useIsFocused } from '@react-navigation/native';
 import { showLocalNotification } from '../../utils/pushNotifications';
 import { useLanguage } from '../../context/LanguageContext';
+import { formatRoomDisplay, formatSlotTime } from '../../utils/format';
 
 interface Doctor {
   id: string;
@@ -137,27 +138,27 @@ export default function HomeScreen() {
           });
         setAllActiveAppointments(activeList);
 
-        // Keep current selected if still active, otherwise pick first
+        let selectedActive: Appointment | null = null;
         setActiveAppointment((prev) => {
           if (prev && activeList.some((a) => a.id === prev.id)) {
-            const updated = activeList.find((a) => a.id === prev.id)!;
-            fetchStaticQueueSummary(updated.doctorId);
-            return updated;
-          }
-          const nextActive = activeList[0] || null;
-          if (nextActive) {
-            fetchStaticQueueSummary(nextActive.doctorId);
+            selectedActive = activeList.find((a) => a.id === prev.id)!;
           } else {
-            // Reset real-time fields
-            setCurrentlyServing('--');
-            setPeopleAhead('--');
-            setEstWaitTime('--');
-            setQueueBannerText('Select a doctor below to book an appointment');
-            setQueueBannerStyle('info');
-            unsubscribeFromQueue();
+            selectedActive = activeList[0] || null;
           }
-          return nextActive;
+          return selectedActive;
         });
+
+        if (selectedActive) {
+          fetchStaticQueueSummary((selectedActive as Appointment).doctorId, selectedActive);
+        } else {
+          // Reset real-time fields
+          setCurrentlyServing('--');
+          setPeopleAhead('--');
+          setEstWaitTime('--');
+          setQueueBannerText('Select a doctor below to book an appointment');
+          setQueueBannerStyle('info');
+          unsubscribeFromQueue();
+        }
       }
 
       // 5. Fetch Notification Unread Count
@@ -178,42 +179,31 @@ export default function HomeScreen() {
     }
   }, [hospitalId, user?.userId, hospitalName]);
 
-  const fetchStaticQueueSummary = async (doctorId: string) => {
-    try {
-      const res = await authFetch(`/hospitals/${hospitalId}/queues/doctor/${doctorId}`);
-      if (res.ok) {
-        const summary = await res.json();
-        if (summary) updateQueueDetails(summary);
-      }
-    } catch (e) {
-      console.error('Error fetching static queue summary:', e);
-    }
-  };
-
-  const updateQueueDetails = useCallback((summary: any) => {
+  const updateQueueDetails = useCallback((summary: any, targetAppt?: Appointment | null) => {
     if (!summary) return;
     const serving = summary.currentlyServingToken || '--';
     setCurrentlyServing(serving);
 
-    if (!activeAppointment) return;
+    const appt = targetAppt !== undefined ? targetAppt : activeAppointment;
+    if (!appt) return;
 
     const todayStr = new Date().toISOString().split('T')[0];
-    const isToday = activeAppointment.appointmentDate === todayStr;
+    const isToday = appt.appointmentDate === todayStr;
 
-    const doc = doctors.find((d) => d.id === (summary.doctorId || activeAppointment.doctorId));
-    const roomName = doc?.roomNumber ? `Room ${doc.roomNumber}` : 'Doctor Room';
+    const doc = doctors.find((d) => d.id === (summary.doctorId || appt.doctorId));
+    const roomName = doc?.roomNumber ? formatRoomDisplay(doc.roomNumber, t.room || 'Room') : 'Doctor Room';
 
     if (!isToday) {
       setPeopleAhead('--');
       setEstWaitTime('--');
       setQueueBannerStyle('info');
-      setQueueBannerText(`📅 Scheduled for ${activeAppointment.appointmentDate} at ${activeAppointment.timeSlot || ''}`);
+      setQueueBannerText(`📅 Scheduled for ${appt.appointmentDate} at ${formatSlotTime(appt.timeSlot)}`);
       return;
     }
 
-    const myToken = activeAppointment.queueNumber;
+    const myToken = appt.queueNumber;
     const entries = summary.entries || [];
-    const myEntry = entries.find((e: any) => (myToken && e.queueNumber === myToken) || e.appointmentId === activeAppointment.id || e.id === activeAppointment.id);
+    const myEntry = entries.find((e: any) => (myToken && e.queueNumber === myToken) || e.appointmentId === appt.id || e.id === appt.id);
 
     if (serving === myToken || (myEntry && (myEntry.status === 'CALLED' || myEntry.status === 'IN_CONSULTATION'))) {
       setPeopleAhead(0);
@@ -227,7 +217,7 @@ export default function HomeScreen() {
       setQueueBannerText('Consultation Completed. Thank you!');
     } else if (myEntry && myEntry.status === 'WAITING') {
       const waitingEntries = entries.filter((e: any) => e.status === 'WAITING');
-      const myIndex = waitingEntries.findIndex((e: any) => (myToken && e.queueNumber === myToken) || e.appointmentId === activeAppointment.id || e.id === activeAppointment.id);
+      const myIndex = waitingEntries.findIndex((e: any) => (myToken && e.queueNumber === myToken) || e.appointmentId === appt.id || e.id === appt.id);
       const aheadCount = myIndex >= 0 ? myIndex : 0;
       const waitStr = aheadCount === 0 ? 'Next up!' : `${aheadCount * 10} mins`;
 
@@ -248,9 +238,21 @@ export default function HomeScreen() {
       setPeopleAhead(summary.waitingCount ?? '--');
       setEstWaitTime(summary.waitingCount ? `${summary.waitingCount * 10} mins` : '--');
       setQueueBannerStyle('info');
-      setQueueBannerText(`📅 Today at ${activeAppointment.timeSlot || ''} (Token ${activeAppointment.queueNumber || '--'})`);
+      setQueueBannerText(`📅 Today at ${formatSlotTime(appt.timeSlot)} (Token ${appt.queueNumber || '--'})`);
     }
-  }, [activeAppointment, doctors]);
+  }, [activeAppointment, doctors, t.room]);
+
+  const fetchStaticQueueSummary = async (doctorId: string, targetAppt?: Appointment | null) => {
+    try {
+      const res = await authFetch(`/hospitals/${hospitalId}/queues/doctor/${doctorId}`);
+      if (res.ok) {
+        const summary = await res.json();
+        if (summary) updateQueueDetails(summary, targetAppt);
+      }
+    } catch (e) {
+      console.error('Error fetching static queue summary:', e);
+    }
+  };
 
   // Hook up WebSockets
   useEffect(() => {
@@ -432,7 +434,12 @@ export default function HomeScreen() {
                     key={appt.id}
                     onPress={() => {
                       setActiveAppointment(appt);
-                      fetchStaticQueueSummary(appt.doctorId);
+                      fetchStaticQueueSummary(appt.doctorId, appt);
+                      if (hospitalId) {
+                        subscribeToQueue(hospitalId, appt.doctorId, (summary) => {
+                          updateQueueDetails(summary, appt);
+                        });
+                      }
                     }}
                     style={{
                       flexDirection: 'row',
@@ -458,7 +465,7 @@ export default function HomeScreen() {
                         color: isSelected ? '#090D16' : '#F8FAFC',
                       }}
                     >
-                      {appt.doctorName} ({appt.queueNumber || appt.timeSlot})
+                      {appt.doctorName} ({appt.queueNumber || formatSlotTime(appt.timeSlot)})
                     </Text>
                   </TouchableOpacity>
                 );
@@ -478,7 +485,12 @@ export default function HomeScreen() {
                 </Text>
               </View>
               <Text style={styles.roomTag}>
-                {activeAppointment ? `${t.room} ${doctors.find(d => d.id === activeAppointment.doctorId)?.roomNumber || '302'}` : `${t.room} --`}
+                {activeAppointment
+                  ? formatRoomDisplay(
+                      doctors.find((d) => d.id === activeAppointment.doctorId)?.roomNumber || '302',
+                      t.room || 'Room'
+                    )
+                  : `${t.room || 'Room'} --`}
               </Text>
             </View>
 
@@ -560,7 +572,7 @@ export default function HomeScreen() {
                 <Text style={styles.scheduleText} numberOfLines={1}>
                   {t.scheduled}{' '}
                   {activeAppointment
-                    ? `${activeAppointment.appointmentDate} ${activeAppointment.timeSlot}`
+                    ? `${activeAppointment.appointmentDate} • ${formatSlotTime(activeAppointment.timeSlot)}`
                     : 'None'}
                 </Text>
               </View>
@@ -725,7 +737,7 @@ export default function HomeScreen() {
                 <View style={styles.docDetailsRow}>
                   <View style={styles.docDetailCell}>
                     <Ionicons name="business-outline" size={14} color="#94A3B8" style={{ marginRight: 4 }} />
-                    <Text style={styles.docDetailText}>Room {doc.roomNumber}</Text>
+                    <Text style={styles.docDetailText}>{formatRoomDisplay(doc.roomNumber, t.room || 'Room')}</Text>
                   </View>
                   <View style={styles.docDetailCell}>
                     <Ionicons name="star" size={13} color="#FBBF24" style={{ marginRight: 3 }} />

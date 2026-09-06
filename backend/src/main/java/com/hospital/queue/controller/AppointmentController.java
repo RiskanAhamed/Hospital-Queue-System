@@ -45,6 +45,8 @@ public class AppointmentController {
     private final NotificationService notificationService;
     private final AuditLogService auditLogService;
     private final SimpMessagingTemplate messagingTemplate;
+    private final com.hospital.queue.service.EmailService emailService;
+    private final com.hospital.queue.repository.HospitalRepository hospitalRepository;
 
     @Data
     public static class RescheduleRequest {
@@ -195,15 +197,15 @@ public class AppointmentController {
         appt.setAppointmentDate(req.getAppointmentDate());
         appt.setTimeSlot(req.getTimeSlot());
 
-        Appointment saved = appointmentRepository.save(appt);
+        Appointment initialSaved = appointmentRepository.save(appt);
 
         // Auto generate queue token for today's appointment
-        if (LocalDate.now().toString().equals(saved.getAppointmentDate())) {
-            queueService.generateQueueForAppointment(saved);
+        if (LocalDate.now().toString().equals(initialSaved.getAppointmentDate())) {
+            queueService.generateQueueForAppointment(initialSaved);
         }
 
         // Fetch latest saved to get the generated queue number
-        saved = appointmentRepository.findById(saved.getId()).orElse(saved);
+        final Appointment saved = appointmentRepository.findById(initialSaved.getId()).orElse(initialSaved);
 
         // Notify patient: "Appointment Confirmed" with queue number in preferred language
         String lang = "ta";
@@ -216,6 +218,30 @@ public class AppointmentController {
                 ? "Your appointment with " + saved.getDoctorName() + " has been booked for " + saved.getAppointmentDate() + " at " + saved.getTimeSlot() + "." + (qNumber != null ? " Your queue token is: " + qNumber + "." : "")
                 : "Dr. " + saved.getDoctorName() + "-உடன் உங்கள் சந்திப்பு " + saved.getAppointmentDate() + " " + saved.getTimeSlot() + "-க்கு உறுதிசெய்யப்பட்டது." + (qNumber != null ? " உங்கள் டோக்கன் எண்: " + qNumber + "." : "");
         notificationService.createAndSendNotification(hospitalId, saved.getPatientId(), "APPOINTMENT_CONFIRMED", notifTitle, notificationMsg);
+
+        // Send Email Confirmation
+        try {
+            if (saved.getPatientId() != null) {
+                userRepository.findById(saved.getPatientId()).ifPresent(pUser -> {
+                    if (pUser.getEmail() != null && !pUser.getEmail().trim().isEmpty()) {
+                        String hospName = hospitalRepository.findById(hospitalId).map(com.hospital.queue.model.Hospital::getName).orElse("MediFlow Hospital");
+                        emailService.sendAppointmentConfirmationEmail(
+                                pUser.getEmail(),
+                                saved.getPatientName(),
+                                saved.getDoctorName(),
+                                doctor.getSpecialization(),
+                                saved.getAppointmentDate(),
+                                saved.getTimeSlot(),
+                                saved.getQueueNumber(),
+                                doctor.getRoomNumber(),
+                                hospName
+                        );
+                    }
+                });
+            }
+        } catch (Exception e) {
+            // Non-blocking email error
+        }
 
         // Audit Log
         auditLogService.log(hospitalId, currentUser.getUserId(), "APPOINTMENT_BOOKED", "Appointment booked for patient " + saved.getPatientName() + " (ID: " + saved.getPatientId() + ") with doctor " + saved.getDoctorName() + " (ID: " + saved.getDoctorId() + ")");
@@ -267,6 +293,26 @@ public class AppointmentController {
                 ? "Your appointment with " + saved.getDoctorName() + " on " + saved.getAppointmentDate() + " has been cancelled."
                 : "Dr. " + saved.getDoctorName() + "-உடன் " + saved.getAppointmentDate() + "-ல் இருந்த உங்கள் சந்திப்பு ரத்து செய்யப்பட்டது.";
         notificationService.createAndSendNotification(hospitalId, saved.getPatientId(), "APPOINTMENT_CANCELLED", cancelTitle, notificationMsg);
+
+        // Send Email Cancellation
+        try {
+            if (saved.getPatientId() != null) {
+                userRepository.findById(saved.getPatientId()).ifPresent(pUser -> {
+                    if (pUser.getEmail() != null && !pUser.getEmail().trim().isEmpty()) {
+                        String hospName = hospitalRepository.findById(hospitalId).map(com.hospital.queue.model.Hospital::getName).orElse("MediFlow Hospital");
+                        emailService.sendAppointmentCancellationEmail(
+                                pUser.getEmail(),
+                                saved.getPatientName(),
+                                saved.getDoctorName(),
+                                saved.getAppointmentDate(),
+                                hospName
+                        );
+                    }
+                });
+            }
+        } catch (Exception e) {
+            // Non-blocking email error
+        }
 
         // Audit Log
         auditLogService.log(hospitalId, currentUser.getUserId(), "APPOINTMENT_CANCELLED", "Appointment cancelled (ID: " + saved.getId() + ")");
@@ -371,15 +417,15 @@ public class AppointmentController {
         appt.setTimeSlot(req.getTimeSlot());
         appt.setStatus("BOOKED");
         appt.setQueueNumber(null);
-        Appointment saved = appointmentRepository.save(appt);
+        Appointment initialSaved = appointmentRepository.save(appt);
 
         // Auto generate queue token if rescheduled to today
-        if (LocalDate.now().toString().equals(saved.getAppointmentDate())) {
-            queueService.generateQueueForAppointment(saved);
+        if (LocalDate.now().toString().equals(initialSaved.getAppointmentDate())) {
+            queueService.generateQueueForAppointment(initialSaved);
         }
 
         // Fetch latest saved to get the generated queue number
-        saved = appointmentRepository.findById(saved.getId()).orElse(saved);
+        final Appointment saved = appointmentRepository.findById(initialSaved.getId()).orElse(initialSaved);
 
         // Notify patient: "Appointment Rescheduled" in preferred language
         String reschedLang = "ta";
@@ -392,6 +438,29 @@ public class AppointmentController {
                 ? "Your appointment with Dr. " + saved.getDoctorName() + " has been rescheduled to " + saved.getAppointmentDate() + " at " + saved.getTimeSlot() + "." + (qNumber != null ? " Your new queue token is: " + qNumber + "." : "")
                 : "Dr. " + saved.getDoctorName() + "-உடன் உங்கள் சந்திப்பு " + saved.getAppointmentDate() + " " + saved.getTimeSlot() + "-க்கு மாற்றப்பட்டது." + (qNumber != null ? " உங்கள் புதிய டோக்கன் எண்: " + qNumber + "." : "");
         notificationService.createAndSendNotification(hospitalId, saved.getPatientId(), "APPOINTMENT_CONFIRMED", reschedTitle, notificationMsg);
+
+        // Send Email Reschedule Notice
+        try {
+            if (saved.getPatientId() != null) {
+                userRepository.findById(saved.getPatientId()).ifPresent(pUser -> {
+                    if (pUser.getEmail() != null && !pUser.getEmail().trim().isEmpty()) {
+                        String hospName = hospitalRepository.findById(hospitalId).map(com.hospital.queue.model.Hospital::getName).orElse("MediFlow Hospital");
+                        emailService.sendAppointmentRescheduledEmail(
+                                pUser.getEmail(),
+                                saved.getPatientName(),
+                                saved.getDoctorName(),
+                                saved.getAppointmentDate(),
+                                saved.getTimeSlot(),
+                                saved.getQueueNumber(),
+                                doctor.getRoomNumber(),
+                                hospName
+                        );
+                    }
+                });
+            }
+        } catch (Exception e) {
+            // Non-blocking email error
+        }
 
         // Audit Log
         auditLogService.log(hospitalId, currentUser.getUserId(), "APPOINTMENT_RESCHEDULED", "Rescheduled appointment (ID: " + saved.getId() + ") for patient " + saved.getPatientName() + " to " + saved.getAppointmentDate() + " at " + saved.getTimeSlot());

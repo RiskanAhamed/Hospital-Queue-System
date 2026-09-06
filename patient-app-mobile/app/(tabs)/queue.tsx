@@ -20,6 +20,7 @@ import {
 } from '../../utils/websocket';
 import { useIsFocused } from '@react-navigation/native';
 import { useLanguage } from '../../context/LanguageContext';
+import { formatRoomDisplay, formatSlotTime } from '../../utils/format';
 
 interface Appointment {
   id: string;
@@ -30,6 +31,7 @@ interface Appointment {
   timeSlot: string;
   queueNumber: string;
   status: string;
+  roomNumber?: string;
 }
 
 export default function QueueScreen() {
@@ -38,6 +40,7 @@ export default function QueueScreen() {
   const isFocused = useIsFocused();
 
   const [activeAppointment, setActiveAppointment] = useState<Appointment | null>(null);
+  const [doctorRoom, setDoctorRoom] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -90,13 +93,30 @@ export default function QueueScreen() {
           setEstWaitTime('--');
           setBannerText('Book an appointment to track live status');
           setBannerStyle('info');
+          setDoctorRoom('');
           unsubscribeFromQueue();
         } else {
+          // Fetch doctor details to obtain real room number
+          let roomStr = '';
+          try {
+            const docRes = await authFetch(`/hospitals/${hospitalId}/doctors`);
+            if (docRes.ok) {
+              const docs = await docRes.json();
+              const foundDoc = (docs || []).find((d: any) => d.id === active.doctorId);
+              if (foundDoc?.roomNumber) {
+                roomStr = foundDoc.roomNumber;
+                setDoctorRoom(foundDoc.roomNumber);
+              }
+            }
+          } catch (e) {
+            // Ignore optional doctor lookup fail
+          }
+
           // Fetch queue summary immediately
           const summaryRes = await authFetch(`/hospitals/${hospitalId}/queues/doctor/${active.doctorId}`);
           if (summaryRes.ok) {
             const summary = await summaryRes.json();
-            updateQueue(summary, active);
+            updateQueue(summary, active, roomStr);
           }
         }
       }
@@ -108,7 +128,7 @@ export default function QueueScreen() {
     }
   }, [hospitalId, user?.userId]);
 
-  const updateQueue = useCallback((summary: any, active: Appointment | null) => {
+  const updateQueue = useCallback((summary: any, active: Appointment | null, roomOverride?: string) => {
     if (!summary) return;
     const serving = summary.currentlyServingToken || '--';
     setCurrentlyServing(serving);
@@ -119,13 +139,14 @@ export default function QueueScreen() {
     const todayStr = new Date().toISOString().split('T')[0];
     const isToday = activeAppt.appointmentDate === todayStr;
 
-    const roomName = `Room 302`; // Default or resolved from details
+    const rawRoom = roomOverride || doctorRoom || activeAppt.roomNumber || '';
+    const roomName = rawRoom ? formatRoomDisplay(rawRoom, t.room || 'Room') : (t.room ? `${t.room} --` : 'Consultation Room');
 
     if (!isToday) {
       setPeopleAhead('--');
       setEstWaitTime('--');
       setBannerStyle('info');
-      setBannerText(`📅 Scheduled for ${activeAppt.appointmentDate} at ${activeAppt.timeSlot || ''}`);
+      setBannerText(`📅 Scheduled for ${activeAppt.appointmentDate} at ${formatSlotTime(activeAppt.timeSlot)}`);
       return;
     }
 
@@ -151,11 +172,11 @@ export default function QueueScreen() {
 
       let statusMsg = `Waiting in queue (${aheadCount} patient${aheadCount !== 1 ? 's' : ''} ahead)`;
       if (aheadCount === 0) {
-        statusMsg = `🔔 You're next in line! Please wait outside consultation room`;
+        statusMsg = `🔔 You're next in line! Please wait outside ${roomName}`;
       } else if (aheadCount === 1) {
-        statusMsg = `🔔 Almost your turn (1 ahead)! Proceed towards consultation room`;
+        statusMsg = `🔔 Almost your turn (1 ahead)! Proceed towards ${roomName}`;
       } else if (aheadCount === 2) {
-        statusMsg = `🔔 2 tokens away! Please head towards the waiting area`;
+        statusMsg = `🔔 2 tokens away! Please head towards ${roomName}`;
       }
 
       setPeopleAhead(aheadCount);
@@ -166,9 +187,9 @@ export default function QueueScreen() {
       setPeopleAhead(summary.waitingCount ?? '--');
       setEstWaitTime(summary.waitingCount ? `${summary.waitingCount * 10} mins` : '--');
       setBannerStyle('info');
-      setBannerText(`📅 Today at ${activeAppt.timeSlot || ''} (Token ${activeAppt.queueNumber || '--'})`);
+      setBannerText(`📅 Today at ${formatSlotTime(activeAppt.timeSlot)} (Token ${activeAppt.queueNumber || '--'})`);
     }
-  }, [activeAppointment]);
+  }, [activeAppointment, doctorRoom, t.room]);
 
   // Handle active WS subscription
   useEffect(() => {

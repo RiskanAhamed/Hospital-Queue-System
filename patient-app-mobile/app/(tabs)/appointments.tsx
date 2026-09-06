@@ -52,6 +52,7 @@ export default function AppointmentsScreen() {
   const isFocused = useIsFocused();
 
   const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [activeFilter, setActiveFilter] = useState<'ALL' | 'UPCOMING' | 'HISTORY'>('ALL');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -185,6 +186,27 @@ export default function AppointmentsScreen() {
     );
   }
 
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  const upcomingList = appointments.filter((a) => {
+    const isPast = a.appointmentDate < todayStr;
+    const isCompletedOrCancelled = a.status === 'COMPLETED' || a.status === 'CANCELLED';
+    return !isPast && !isCompletedOrCancelled;
+  });
+
+  const historyList = appointments.filter((a) => {
+    const isPast = a.appointmentDate < todayStr;
+    const isCompletedOrCancelled = a.status === 'COMPLETED' || a.status === 'CANCELLED';
+    return isPast || isCompletedOrCancelled;
+  });
+
+  const displayedAppointments =
+    activeFilter === 'UPCOMING'
+      ? upcomingList
+      : activeFilter === 'HISTORY'
+      ? historyList
+      : appointments;
+
   return (
     <View style={styles.container}>
       {/* Header bar */}
@@ -195,11 +217,41 @@ export default function AppointmentsScreen() {
         </TouchableOpacity>
       </View>
 
+      {/* Filter Segment Tabs */}
+      <View style={styles.filterTabsContainer}>
+        <TouchableOpacity
+          style={[styles.filterTab, activeFilter === 'ALL' && styles.filterTabActive]}
+          onPress={() => setActiveFilter('ALL')}
+        >
+          <Text style={[styles.filterTabText, activeFilter === 'ALL' && styles.filterTabTextActive]}>
+            {t.tabAll || 'All'} ({appointments.length})
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.filterTab, activeFilter === 'UPCOMING' && styles.filterTabActive]}
+          onPress={() => setActiveFilter('UPCOMING')}
+        >
+          <Text style={[styles.filterTabText, activeFilter === 'UPCOMING' && styles.filterTabTextActive]}>
+            {t.tabUpcoming || 'Upcoming'} ({upcomingList.length})
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.filterTab, activeFilter === 'HISTORY' && styles.filterTabActive]}
+          onPress={() => setActiveFilter('HISTORY')}
+        >
+          <Text style={[styles.filterTabText, activeFilter === 'HISTORY' && styles.filterTabTextActive]}>
+            {t.tabHistory || 'History'} ({historyList.length})
+          </Text>
+        </TouchableOpacity>
+      </View>
+
       <ScrollView
         contentContainerStyle={styles.scrollContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        {appointments.length === 0 ? (
+        {displayedAppointments.length === 0 ? (
           <View style={styles.emptyContainer}>
             <Ionicons name="calendar-outline" size={60} color="#64748B" style={{ marginBottom: 12 }} />
             <Text style={styles.emptyTitle}>{t.noAppointments}</Text>
@@ -208,9 +260,16 @@ export default function AppointmentsScreen() {
             </Text>
           </View>
         ) : (
-          appointments.map((item) => {
+          displayedAppointments.map((item) => {
             const sc = STATUS_COLORS[item.status] || { bg: 'rgba(255,255,255,0.06)', color: '#94A3B8' };
-            const canAction = item.status === 'BOOKED' || item.status === 'CHECKED_IN' || item.status === 'WAITING';
+            const isPast = item.appointmentDate < todayStr;
+            const isCompletedOrCancelled = item.status === 'COMPLETED' || item.status === 'CANCELLED';
+
+            // Only BOOKED future/today appointments can be rescheduled
+            const canReschedule = item.status === 'BOOKED' && !isPast;
+            // Only non-completed/non-cancelled future/today appointments can be cancelled
+            const canCancel = !isPast && !isCompletedOrCancelled;
+            const hasActions = canReschedule || canCancel;
 
             return (
               <View key={item.id} style={styles.apptCard}>
@@ -254,7 +313,7 @@ export default function AppointmentsScreen() {
                           </Text>
                           {item.feedbackComment && (
                             <Text style={{ color: '#94A3B8', fontSize: 12, marginLeft: 8, fontStyle: 'italic' }}>
-                              "{item.feedbackComment}"
+                              &ldquo;{item.feedbackComment}&rdquo;
                             </Text>
                           )}
                         </View>
@@ -288,33 +347,37 @@ export default function AppointmentsScreen() {
                 )}
 
                 {/* Actions row */}
-                {canAction && (
+                {hasActions && (
                   <View style={styles.actionsRow}>
-                    <TouchableOpacity
-                      style={styles.btnReschedule}
-                      onPress={() =>
-                        router.push({
-                          pathname: '/reschedule',
-                          params: {
-                            apptId: item.id,
-                            doctorId: item.doctorId,
-                            doctorName: item.doctorName,
-                            specialty: item.departmentName,
-                          },
-                        })
-                      }
-                    >
-                      <Ionicons name="create-outline" size={14} color="#38BDF8" style={{ marginRight: 4 }} />
-                      <Text style={styles.btnRescheduleText}>Reschedule</Text>
-                    </TouchableOpacity>
+                    {canReschedule && (
+                      <TouchableOpacity
+                        style={styles.btnReschedule}
+                        onPress={() =>
+                          router.push({
+                            pathname: '/reschedule',
+                            params: {
+                              apptId: item.id,
+                              doctorId: item.doctorId,
+                              doctorName: item.doctorName,
+                              specialty: item.departmentName,
+                            },
+                          })
+                        }
+                      >
+                        <Ionicons name="create-outline" size={14} color="#38BDF8" style={{ marginRight: 4 }} />
+                        <Text style={styles.btnRescheduleText}>Reschedule</Text>
+                      </TouchableOpacity>
+                    )}
 
-                    <TouchableOpacity
-                      style={styles.btnCancel}
-                      onPress={() => handleCancelAppointment(item.id)}
-                    >
-                      <Ionicons name="close-circle-outline" size={14} color="#F87171" style={{ marginRight: 4 }} />
-                      <Text style={styles.btnCancelText}>Cancel</Text>
-                    </TouchableOpacity>
+                    {canCancel && (
+                      <TouchableOpacity
+                        style={[styles.btnCancel, !canReschedule && { flex: 1, justifyContent: 'center' }]}
+                        onPress={() => handleCancelAppointment(item.id)}
+                      >
+                        <Ionicons name="close-circle-outline" size={14} color="#F87171" style={{ marginRight: 4 }} />
+                        <Text style={styles.btnCancelText}>Cancel</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 )}
               </View>
@@ -434,6 +497,38 @@ const styles = StyleSheet.create({
   },
   refreshBtn: {
     padding: 4,
+  },
+  filterTabsContainer: {
+    flexDirection: 'row',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    gap: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.06)',
+  },
+  filterTab: {
+    flex: 1,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  filterTabActive: {
+    backgroundColor: '#38BDF8',
+    borderColor: '#38BDF8',
+  },
+  filterTabText: {
+    color: '#94A3B8',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  filterTabTextActive: {
+    color: '#090D16',
+    fontWeight: '800',
   },
   scrollContent: {
     padding: 16,

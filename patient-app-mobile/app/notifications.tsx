@@ -19,6 +19,8 @@ import { useLanguage } from '../context/LanguageContext';
 
 interface NotificationItem {
   id: string;
+  type?: string;
+  title?: string;
   message: string;
   read: boolean;
   createdAt: string;
@@ -110,21 +112,23 @@ export default function NotificationsScreen() {
   const formatTime = (timeStr: string) => {
     try {
       if (!timeStr) return '';
-      const d = new Date(timeStr.includes('Z') || timeStr.includes('+') ? timeStr : timeStr + 'Z');
-      if (isNaN(d.getTime())) {
-        const fallback = new Date(timeStr);
-        if (isNaN(fallback.getTime())) return timeStr;
-        d.setTime(fallback.getTime());
+      // Parse ISO date parts directly to preserve local server/client timestamp
+      const [datePart, timePart] = timeStr.split('T');
+      if (datePart && timePart) {
+        const [year, month, day] = datePart.split('-').map(Number);
+        const [hour, minute] = timePart.split(':').map(Number);
+        const d = new Date(year, month - 1, day, hour, minute || 0);
+        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+        const monthName = months[d.getMonth()];
+        let h = d.getHours();
+        const m = String(d.getMinutes()).padStart(2, '0');
+        const ampm = h >= 12 ? 'PM' : 'AM';
+        h = h % 12;
+        h = h ? h : 12;
+        return `${monthName} ${day}, ${h}:${m} ${ampm}`;
       }
-      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      const month = months[d.getMonth()];
-      const day = d.getDate();
-      let hours = d.getHours();
-      const minutes = String(d.getMinutes()).padStart(2, '0');
-      const ampm = hours >= 12 ? 'PM' : 'AM';
-      hours = hours % 12;
-      hours = hours ? hours : 12;
-      return `${month} ${day}, ${hours}:${minutes} ${ampm}`;
+      const d = new Date(timeStr);
+      return isNaN(d.getTime()) ? timeStr : d.toLocaleDateString();
     } catch {
       return timeStr;
     }
@@ -179,12 +183,19 @@ export default function NotificationsScreen() {
               activeOpacity={item.read ? 1 : 0.7}
             >
               <View style={styles.notifHeader}>
-                <View style={styles.iconContainer}>
-                  <Ionicons
-                    name={item.read ? 'mail-open-outline' : 'mail-unread'}
-                    size={16}
-                    color={item.read ? '#94A3B8' : '#38BDF8'}
-                  />
+                <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: 8 }}>
+                  <View style={styles.iconContainer}>
+                    <Ionicons
+                      name={item.read ? 'mail-open-outline' : 'mail-unread'}
+                      size={16}
+                      color={item.read ? '#94A3B8' : '#38BDF8'}
+                    />
+                  </View>
+                  {item.title ? (
+                    <Text style={[styles.notifTitle, !item.read && styles.notifTitleUnread]} numberOfLines={1}>
+                      {item.title}
+                    </Text>
+                  ) : null}
                 </View>
                 <Text style={styles.timeText}>{formatTime(item.createdAt)}</Text>
               </View>
@@ -299,6 +310,15 @@ const styles = StyleSheet.create({
   },
   iconContainer: {
     marginRight: 6,
+  },
+  notifTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#94A3B8',
+  },
+  notifTitleUnread: {
+    color: '#38BDF8',
+    fontWeight: '700',
   },
   timeText: {
     fontSize: 10,

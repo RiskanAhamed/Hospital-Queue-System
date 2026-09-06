@@ -57,6 +57,9 @@ export const translations = {
     commentsLabel: 'Comments & Review (Optional)',
     feedbackPlaceholder: 'Share details of your consultation experience...',
     submitRating: 'Submit Rating',
+    tabAll: 'All',
+    tabUpcoming: 'Upcoming',
+    tabHistory: 'History',
     
     // Profile Tab
     myProfile: 'My Profile',
@@ -135,6 +138,9 @@ export const translations = {
     commentsLabel: 'கருத்துகள் & விமர்சனம் (விருப்பப்பட்டால்)',
     feedbackPlaceholder: 'சந்திப்பு பற்றிய கூடுதல் கருத்துக்களை பகிரவும்...',
     submitRating: 'மதிப்பீட்டை அனுப்பு',
+    tabAll: 'அனைத்தும்',
+    tabUpcoming: 'வரவிருப்பவை',
+    tabHistory: 'முடிந்தவை / வரலாறு',
     
     // Profile Tab
     myProfile: 'என் சுயவிவரம்',
