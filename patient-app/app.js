@@ -802,6 +802,38 @@ function scrollToSection(sectionId) {
 
 // ─── BUG 35 FIX: Full Appointment History ────────────────────────────────────
 
+// Filter state — matches mobile APK (All / Upcoming / History)
+let apptActiveFilter = 'ALL';
+let apptAllData = [];
+
+function setApptFilter(filter) {
+    apptActiveFilter = filter;
+    const tabs = { ALL: 'apptTabAll', UPCOMING: 'apptTabUpcoming', HISTORY: 'apptTabHistory' };
+    Object.entries(tabs).forEach(([key, id]) => {
+        const btn = document.getElementById(id);
+        if (!btn) return;
+        const isActive = key === filter;
+        btn.style.background = isActive ? 'var(--primary)' : 'transparent';
+        btn.style.color = isActive ? '#090D16' : 'var(--text-muted)';
+    });
+    renderAppointmentHistory(apptAllData);
+}
+
+// Port of mobile utils/format.ts formatSlotTime
+function formatSlotTime(slot) {
+    if (!slot || slot.trim() === '') return '--';
+    try {
+        const [hh, mm] = slot.split(':');
+        const h = parseInt(hh, 10);
+        if (isNaN(h)) return slot;
+        const period = h < 12 ? 'AM' : 'PM';
+        const dh = h === 0 ? 12 : h > 12 ? h - 12 : h;
+        return `${String(dh).padStart(2, '0')}:${mm || '00'} ${period}`;
+    } catch {
+        return slot;
+    }
+}
+
 function fetchAppointmentHistory() {
     const auth = getPatientAuth();
     if (!auth || !auth.userId || !currentHospitalId) return;
@@ -814,7 +846,10 @@ function fetchAppointmentHistory() {
             if (!r.ok) throw new Error(`HTTP ${r.status}`);
             return r.json();
         })
-        .then(appts => renderAppointmentHistory(appts || []))
+        .then(appts => {
+            apptAllData = appts || [];
+            renderAppointmentHistory(apptAllData);
+        })
         .catch(err => {
             // Never fail silently — show a visible error message (BUG 34 pattern)
             if (container) container.innerHTML = `
@@ -839,7 +874,34 @@ function renderAppointmentHistory(appts) {
     const container = document.getElementById('appointmentHistoryContainer');
     if (!container) return;
 
-    if (!appts || appts.length === 0) {
+    const todayStr = new Date().toISOString().split('T')[0];
+
+    // Build upcoming / history splits for tab counts
+    const upcomingList = (appts || []).filter(a => {
+        const isPast = a.appointmentDate < todayStr;
+        const isDone = a.status === 'COMPLETED' || a.status === 'CANCELLED';
+        return !isPast && !isDone;
+    });
+    const historyList = (appts || []).filter(a => {
+        const isPast = a.appointmentDate < todayStr;
+        const isDone = a.status === 'COMPLETED' || a.status === 'CANCELLED';
+        return isPast || isDone;
+    });
+
+    // Update tab count badges
+    const allCount = document.getElementById('apptTabAllCount');
+    const upCount = document.getElementById('apptTabUpcomingCount');
+    const hiCount = document.getElementById('apptTabHistoryCount');
+    if (allCount) allCount.textContent = `(${appts.length})`;
+    if (upCount) upCount.textContent = `(${upcomingList.length})`;
+    if (hiCount) hiCount.textContent = `(${historyList.length})`;
+
+    // Apply active filter
+    const displayed = apptActiveFilter === 'UPCOMING' ? upcomingList
+        : apptActiveFilter === 'HISTORY' ? historyList
+        : appts;
+
+    if (!displayed || displayed.length === 0) {
         container.innerHTML = `
             <div style="text-align:center; padding:32px 0; color:var(--text-muted);">
                 <p style="font-size:2rem; margin-bottom:8px;">&#128197;</p>
@@ -850,7 +912,7 @@ function renderAppointmentHistory(appts) {
     }
 
     // Sort newest first
-    const sorted = [...appts].sort((a, b) => {
+    const sorted = [...displayed].sort((a, b) => {
         const da = a.appointmentDate || '';
         const db = b.appointmentDate || '';
         return db.localeCompare(da) || (b.timeSlot || '').localeCompare(a.timeSlot || '');
@@ -859,6 +921,7 @@ function renderAppointmentHistory(appts) {
     container.innerHTML = sorted.map(appt => {
         const sc = STATUS_COLORS[appt.status] || { bg: 'rgba(255,255,255,0.06)', color: 'var(--text-muted)' };
         const canCancel = appt.status !== 'CANCELLED' && appt.status !== 'COMPLETED';
+        const formattedSlot = formatSlotTime(appt.timeSlot);
         return `
             <div style="background:var(--bg-card); border:1px solid var(--border-color); border-radius:14px; padding:16px; margin-bottom:12px;">
                 <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;">
@@ -872,7 +935,7 @@ function renderAppointmentHistory(appts) {
                 </div>
                 <div style="display:flex; gap:16px; font-size:0.78rem; color:var(--text-muted); margin-bottom:${canCancel ? '10px' : '0'};">
                     <span>&#128197; ${escapeHtml(appt.appointmentDate || '—')}</span>
-                    <span>&#128336; ${escapeHtml(appt.timeSlot || '—')}</span>
+                    <span>&#128336; ${escapeHtml(formattedSlot)}</span>
                     ${appt.queueNumber ? `<span>&#127915; Token: <strong style="color:var(--primary);">${escapeHtml(appt.queueNumber)}</strong></span>` : ''}
                 </div>
                 ${appt.status === 'COMPLETED' ? `

@@ -168,10 +168,22 @@
 
             <!-- ═══════ VIEW: APPOINTMENTS — BUG 35 FIX: full history ═══════ -->
             <section id="view-appointments" class="section-block" style="display:none;">
-                <div class="section-header" style="margin-bottom:14px;">
+                <div class="section-header" style="margin-bottom:12px;">
                     <h4 class="section-title">My Appointments</h4>
                     <button class="btn-text" onclick="fetchAppointmentHistory()" style="font-size:0.78rem;">
                         <i data-lucide="refresh-cw"></i> Refresh
+                    </button>
+                </div>
+                <!-- Filter Segment Tabs (matches mobile APK) -->
+                <div id="apptFilterTabs" style="display:flex; gap:6px; margin-bottom:14px; background:rgba(255,255,255,0.04); border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:4px;">
+                    <button id="apptTabAll" onclick="setApptFilter('ALL')" style="flex:1; padding:7px 6px; border-radius:9px; border:none; font-size:0.8rem; font-weight:700; cursor:pointer; background:var(--primary); color:#090D16; transition:all 0.2s;">
+                        All <span id="apptTabAllCount" style="opacity:0.7;"></span>
+                    </button>
+                    <button id="apptTabUpcoming" onclick="setApptFilter('UPCOMING')" style="flex:1; padding:7px 6px; border-radius:9px; border:none; font-size:0.8rem; font-weight:700; cursor:pointer; background:transparent; color:var(--text-muted); transition:all 0.2s;">
+                        Upcoming <span id="apptTabUpcomingCount" style="opacity:0.7;"></span>
+                    </button>
+                    <button id="apptTabHistory" onclick="setApptFilter('HISTORY')" style="flex:1; padding:7px 6px; border-radius:9px; border:none; font-size:0.8rem; font-weight:700; cursor:pointer; background:transparent; color:var(--text-muted); transition:all 0.2s;">
+                        History <span id="apptTabHistoryCount" style="opacity:0.7;"></span>
                     </button>
                 </div>
                 <div id="appointmentHistoryContainer">
